@@ -47,7 +47,7 @@ var api_key_novel;
 var is_colab = true;
 var charactersPath = 'public/characters/';
 var chatsPath = 'public/chats/';
-if (is_colab){
+if (is_colab && process.env.googledrive == 2){
     charactersPath = '/content/drive/MyDrive/TavernAI/characters/';
     chatsPath = '/content/drive/MyDrive/TavernAI/chats/';
 }
@@ -65,7 +65,7 @@ app.use(function (req, res, next) { //Security
 });
 
 app.use((req, res, next) => {
-  if (req.url.startsWith('/characters/') && is_colab) {
+  if (req.url.startsWith('/characters/') && is_colab && process.env.googledrive == 2) {
       
     const filePath = path.join(charactersPath, req.url.substr('/characters'.length));
     fs.access(filePath, fs.constants.R_OK, (err) => {
