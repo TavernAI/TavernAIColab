@@ -68,7 +68,7 @@ var response_getlastversion;
 var api_key_novel;
 var api_key_openai;
 
-var is_colab = false;
+var is_colab = true;
 var charactersPath = 'public/characters/';
 var chatsPath = 'public/chats/';
 if (is_colab && process.env.googledrive == 2){
