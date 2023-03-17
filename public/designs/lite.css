@@ -952,3 +952,10 @@ a {
     background-color: unset;
     
 }
+/*searchbox*/
+#search_bar  {
+    background-color: #191b31fF;
+}
+#search_bar::placeholder  {
+    color: #ffffffaa;
+}

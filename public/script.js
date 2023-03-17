@@ -34,10 +34,9 @@ $(document).ready(function(){
     var characloud_characters = [];
     var characloud_characters_rows;
     var characloud_found_characters = [];
-    var charaCloudServer = 'http://127.0.0.1:3000';
-    var charaCloudMode = false;
+    var charaCloudServer = 'http://127.0.0.1:80';
     ///////////
-    const VERSION = '1.3.0';
+    const VERSION = '1.3.1';
     var converter = new showdown.Converter();
     var bg_menu_toggle = false;
     var default_user_name = "You";
@@ -111,6 +110,7 @@ $(document).ready(function(){
     var this_edit_mes_text = '';
     var this_edit_mes_chname = '';
     var this_edit_mes_id;
+    var this_edit_target_id = undefined;
 
     const delay = ms => new Promise(res => setTimeout(res, ms));
     //settings
@@ -144,6 +144,7 @@ $(document).ready(function(){
     
     var lock_context_size = false;
     var multigen = false;
+    var singleline = false;
     var swipes = false;
     var keep_dialog_examples = false;
     var free_char_name_mode = false;
@@ -439,7 +440,7 @@ $(document).ready(function(){
         characters.forEach(function(item, i, arr) {
             var this_avatar = default_avatar;
             if(item.avatar != 'none'){
-                this_avatar = "characters/"+item.avatar;
+                this_avatar = "characters/"+item.avatar+"?v="+Date.now();
 
             }
             $("#rm_print_charaters_block").prepend('<div class=character_select chid='+i+'><div class=avatar><img src="'+this_avatar+'"></div><div class=ch_name_menu>'+item.name+'</div></div>');
@@ -469,6 +470,7 @@ $(document).ready(function(){
 
             for(var i = 0; i < load_ch_count.length;i++){
 
+
                 characters[i] = [];
                 characters[i] = getData[i];
                 
@@ -477,6 +479,7 @@ $(document).ready(function(){
                 }
             }
             characters.sort((a,b) =>  a.add_date - b.add_date );
+            //characters.sort((a, b) => (a.name.toLowerCase() > b.name.toLowerCase()) ? 1 : -1);
             //characters.reverse();
             if(this_chid != undefined) $("#avatar_url_pole").val(characters[this_chid].avatar);
             printCharaters();
@@ -608,39 +611,28 @@ $(document).ready(function(){
         }
         return mes;
     }
-    function addOneMessage(mes, type='normal'){
-        //var message = mes['mes'];
-        //message = mes['mes'].replace(/^\s+/g, '');
-        //console.log(message.indexOf(name1+":"));
+    function getMessageAvatar(mes) {
+        var avatarImg = "User Avatars/"+user_avatar;
+        if(!mes.is_user){
+            if(this_chid === undefined) {
+                avatarImg = "img/chloe.png";
+            } else {
+                mes.chid = mes.chid || parseInt(this_chid);
+                avatarImg = characters[mes.chid].avatar == 'none' ? "img/fluffy.png" : "characters/"+characters[this_chid].avatar + "#t=" + Date.now();
+            }
+        } else {
+            delete mes.chid;
+        }
+        return avatarImg;
+    }
+    function addOneMessage(mes, type='normal') {
         var messageText = mes['mes'];
         var characterName = name1;
-        var avatarImg = "User Avatars/"+user_avatar;
         generatedPromtCache = '';
-        //thisText = thisText.split("\n").join("<br>");
-        var avatarImg = "User Avatars/"+user_avatar;
-        if(!mes['is_user']){
-            if(this_chid == undefined){
-                avatarImg = "img/chloe.png";
-            }else{
-                if(characters[this_chid].avatar != 'none'){
-                    avatarImg = "characters/"+characters[this_chid].avatar;
-                    if(is_mes_reload_avatar !== false){
-                        avatarImg+="#"+is_mes_reload_avatar;
-                        //console.log(avatarImg);
-                    }
-                }else{
-                    avatarImg = "img/fluffy.png";
-                }
-            }
-            characterName = name2;
+        var avatarImg = getMessageAvatar(mes);
+        if(!mes.is_user){
+            characterName = characters[mes.chid] ? characters[mes.chid].name : "Chloe";
         }
-
-        //Formating
-        //messageText = messageText.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/\*(.+?)\*/g, '<i>$1</i>').replace(/\n/g, '<br/>');
-        //if(characterName != name1){
-            //messageText = messageText.replaceAll(name2+":", "");
-        //}
-        //console.log(messageText);
         if(count_view_mes == 0){
             messageText = messageText.replace(/{{user}}/gi, name1);
             messageText = messageText.replace(/{{char}}/gi, name2);
@@ -648,15 +640,39 @@ $(document).ready(function(){
             messageText = messageText.replace(/<BOT>/gi, name2);
         }
         messageText = messageFormating(messageText, characterName);
+        let container = null;
         if(type !== 'swipe'){
-            $("#chat").append( '<div class="mes" mesid='+count_view_mes+' ch_name="'+characterName+'" is_user="'+mes['is_user']+'"><div class="for_checkbox"></div><input type="checkbox" class="del_checkbox"><div class=avatar><img src="'+avatarImg+'"></div><div class=mes_block><div class=ch_name>'+characterName+'<div title=Edit class=mes_edit><img src=img/scroll.png></div><div class=mes_edit_cancel><img src=img/cancel.png></div><div class=mes_edit_done><img src=img/done.png></div></div><div class=mes_text>'+'</div></div><div class="swipe_left"><img src="img/swipe_left.png"></div><div class="swipe_right"><img src="img/swipe_right.png"></div></div>' );
+                container = $('<div class="mes" mesid='+count_view_mes+' ch_name="'+characterName+'" is_user="'+mes['is_user']+'"></div>')
+                container.append('<div class="for_checkbox"></div><input type="checkbox" class="del_checkbox">');       // delete checkbox
+                container.append('<div class="avatar"><img class="avt_img" src="'+avatarImg+'"></div>');                                // avatar
+
+            let messageBlock = $('<div class="mes_block"></div>');
+                messageBlock.append('<div class="ch_name">'+characterName+'</div>');                                    // character name block
+                messageBlock.append('<select class="name_select"></select>');                                    // character name selector for editing
+            container.append(messageBlock);
+
+            // message content
+            messageBlock.append('<div class="mes_text"></div>');
+
+            container.append('<div title="Edit" class="mes_edit"><img src="img/scroll.png"></div>');                // edit button
+            let editMenu = $('<div class="edit_block"></div>');                                                         // edit menu shown when edit button is pressed
+                editMenu.append('<div class="mes_edit_done"><img src="img/done.png"></div>');                           // confirm button
+                editMenu.append('<div class="mes_edit_clone" title="Create copy"><img src=img/clone.png></div>');
+                editMenu.append('<div class="mes_edit_delete" title="Delete"><img src=img/del_mes.png></div>');
+                editMenu.append('<div class="mes_up" title="Move up"><img src=img/arrow_up.png></div>');
+                editMenu.append('<div class="mes_down"><img src="img/arrow_down.png" title="Move down"></div>');
+                editMenu.append('<div class="mes_edit_cancel"><img src="img/cancel.png"></div>');                       // cancel (close menu)
+            container.append(editMenu);
+
+            /* Swipes */
+            container.append('<div class="swipe_left"><img src="img/swipe_left.png"></div>');
+            container.append('<div class="swipe_right"><img src="img/swipe_right.png"></div>');
+
+            $("#chat").append(container);
         }
         
         if(!if_typing_text){
-            
-
             if(type === 'swipe'){
-                
                 $("#chat").children().filter('[mesid="'+(count_view_mes-1)+'"]').children('.mes_block').children('.mes_text').html('');
                 $("#chat").children().filter('[mesid="'+(count_view_mes-1)+'"]').children('.mes_block').children('.mes_text').append(messageText);
                 if(mes['swipe_id'] !== 0 && swipes){
@@ -664,7 +680,6 @@ $(document).ready(function(){
                     $("#chat").children().filter('[mesid="'+(count_view_mes-1)+'"]').children('.swipe_left').css('display', 'block');
                 }
             }else{
-                
                 $("#chat").children().filter('[mesid="'+count_view_mes+'"]').children('.mes_block').children('.mes_text').append(messageText);
                 
                 hideSwipeButtons();
@@ -706,6 +721,8 @@ $(document).ready(function(){
         $('#chat .mes').last().addClass('last_mes');
         $('#chat .mes').eq(-2).removeClass('last_mes');
         $textchat.scrollTop($textchat[0].scrollHeight);
+
+        return container;
     }
     function typeWriter(target, text, speed, i) {
         if (i < text.length) {
@@ -731,6 +748,7 @@ $(document).ready(function(){
     });
     async function Generate(type) {//encode("dsfs").length
         const gap_holder = 120;
+        var textareaText = '';
         tokens_already_generated = 0;
         if(!free_char_name_mode){
             message_already_generated = name2+': ';
@@ -739,7 +757,7 @@ $(document).ready(function(){
         }
         if(online_status != 'no_connection' && this_chid != undefined){
             if(type === 'regenerate'){
-                var textareaText = "";
+                textareaText = "";
                 if(chat[chat.length-1]['is_user']){//If last message from You
 
                 }else{
@@ -749,8 +767,10 @@ $(document).ready(function(){
                 }
                 
             }else{
-                var textareaText = $("#send_textarea").val();
-                $("#send_textarea").val('');
+                if(type !== 'swipe'){
+                    textareaText = $("#send_textarea").val();
+                    $("#send_textarea").val('');
+                }
             }
             //$("#send_textarea").attr("disabled","disabled");
 
@@ -850,7 +870,7 @@ $(document).ready(function(){
                     Scenario = Scenario.replace(/<BOT>/gi, name2);
                 }
             }
-
+            
 
             if(is_pygmalion){
                 if(charDescription.length > 0){
@@ -883,7 +903,16 @@ $(document).ready(function(){
 
 
             }
+            
 
+            if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')){
+                let osp_string = openai_system_prompt.replace(/{{user}}/gi, name1) //System prompt for OpenAI
+                                .replace(/{{char}}/gi, name2)
+                                .replace(/<USER>/gi, name1)
+                                .replace(/<BOT>/gi, name2);
+                storyString = osp_string+'\n'+storyString;
+            }
+            
             var count_exm_add = 0;
             var chat2 = [];
             var j = 0;
@@ -1015,7 +1044,9 @@ $(document).ready(function(){
                             //chatString+=postAnchor+"\n";//"[Writing style: very long messages]\n";
                             item =item+ anchorBottom+"\n";
                         }
-                        if(!free_char_name_mode){
+                        
+
+                        if(!free_char_name_mode && !(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301'))){
                             if(i >= arrMes.length-1 && $.trim(item).substr(0, (name1+":").length) == name1+":"){//for add name2 when user sent
                                 item =item+name2+":";
                             }
@@ -1090,12 +1121,9 @@ $(document).ready(function(){
                 if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')){
                     finalPromt = {};
                     finalPromt = [];
-                    let osp_string = openai_system_prompt.replace(/{{user}}/gi, name1)
-                            .replace(/{{char}}/gi, name2)
-                            .replace(/<USER>/gi, name1)
-                            .replace(/<BOT>/gi, name2);
                     
-                    finalPromt[0] = {"role": "system", "content": osp_string+"\n"+storyString+mesExmString};
+                    
+                    finalPromt[0] = {"role": "system", "content": storyString+mesExmString};
                     mesSend.forEach(function(item,i){
                         if(item.indexOf(name1+':') === 0){
                             finalPromt[i+1] = {"role": "user", "content": item};
@@ -1139,7 +1167,7 @@ $(document).ready(function(){
                     }
                 }
                 if(main_api == 'kobold'){
-                    var generate_data = {prompt: finalPromt, gui_settings: true, max_context_length: this_max_context};
+                    var generate_data = {prompt: finalPromt, gui_settings: true, max_context_length: this_max_context, singleline: singleline};
                     if(preset_settings != 'gui'){
 
                         var this_settings = koboldai_settings[koboldai_setting_names[preset_settings]];
@@ -1158,6 +1186,7 @@ $(document).ready(function(){
                                         top_k: parseInt(top_k),
                                         top_p: parseFloat(top_p),
                                         typical: parseFloat(typical),
+                                        singleline: singleline,
                                         s1:this_settings.sampler_order[0],
                                         s2:this_settings.sampler_order[1],
                                         s3:this_settings.sampler_order[2],
@@ -1662,7 +1691,7 @@ $(document).ready(function(){
         if(characters[chid].avatar != 'none'){
                 this_avatar = "characters/"+characters[chid].avatar;
         }
-        $("#avatar_load_preview").attr('src',this_avatar);
+        $("#avatar_load_preview").attr('src',this_avatar+"?v="+Date.now());
         $("#name_div").css("display", "none");
 
         $("#form_create").attr("actiontype", "editcharacter");
@@ -2349,6 +2378,10 @@ $(document).ready(function(){
         if(is_send_press == false && count_view_mes > 1){
             hideSwipeButtons();
             is_send_press = true;
+            if(this_edit_mes_id === chat.length-1) {
+                this_edit_target_id = undefined;
+                this_edit_mes_id = undefined;
+            }
             Generate('regenerate');
         }
     });
@@ -2600,6 +2633,7 @@ $(document).ready(function(){
             $('#master_settings_koboldai_block').css("display", "grid");
             $('#master_settings_novelai_block').css("display", "none");
             $('#master_settings_openai_block').css("display", "none");
+            $('#singleline_toggle').css("display", "grid");
 
             main_api = 'kobold';
         }
@@ -2610,6 +2644,7 @@ $(document).ready(function(){
             $('#master_settings_koboldai_block').css("display", "none");
             $('#master_settings_novelai_block').css("display", "grid");
             $('#master_settings_openai_block').css("display", "none");
+            $('#singleline_toggle').css("display", "none");
 
             main_api = 'novel';
         }
@@ -2620,6 +2655,7 @@ $(document).ready(function(){
             $('#master_settings_koboldai_block').css("display", "none");
             $('#master_settings_novelai_block').css("display", "none");
             $('#master_settings_openai_block').css("display", "grid");
+            $('#singleline_toggle').css("display", "none");
             main_api = 'openai';
         }
     }
@@ -2748,6 +2784,18 @@ $(document).ready(function(){
     });
     $('#multigen').change(function() {
         multigen = !!$('#multigen').prop('checked');
+        saveSettings();
+    });
+    $('#singleline').change(function() {
+        singleline = !!$('#singleline').prop('checked');
+        saveSettings();
+    });
+    $('#autoconnect').change(function() {
+        settings.auto_connect = !!$('#autoconnect').prop('checked');
+        saveSettings();
+    });
+    $('#characloud').change(function() {
+        settings.characloud = !!$('#characloud').prop('checked');
         saveSettings();
     });
     $('#swipes').change(function() {
@@ -2929,7 +2977,6 @@ $(document).ready(function(){
                     }
                     
                     charaCloudServer = data.charaCloudServer;
-                    charaCloudMode = data.charaCloudMode;
                     characterFormat = data.characterFormat;
                     
                     designs = data.designs;
@@ -3174,14 +3221,20 @@ $(document).ready(function(){
                     character_anchor = !!settings.character_anchor;//if(settings.character_anchor !== undefined) character_anchor = !!settings.character_anchor;
                     lock_context_size = !!settings.lock_context_size;
                     multigen = !!settings.multigen;
+                    singleline = !!settings.singleline;
                     swipes = !!settings.swipes;
                     keep_dialog_examples = !!settings.keep_dialog_examples;
                     free_char_name_mode = !!settings.free_char_name_mode;
+                    settings.auto_connect = settings.auto_connect === false ? false : true;
+                    settings.characloud = settings.characloud === false ? false : true;
                     
                     $('#style_anchor').prop('checked', style_anchor);
                     $('#character_anchor').prop('checked', character_anchor);
                     $('#lock_context_size').prop('checked', lock_context_size);
                     $('#multigen').prop('checked', multigen);
+                    $('#singleline').prop('checked', singleline);
+                    $('#autoconnect').prop('checked', settings.auto_connect);
+                    $('#characloud').prop('checked', settings.characloud);
                     $('#swipes').prop('checked', swipes);
                     $('#keep_dialog_examples').prop('checked', keep_dialog_examples);
                     $('#free_char_name_mode').prop('checked', free_char_name_mode);
@@ -3268,8 +3321,16 @@ $(document).ready(function(){
 
                     api_server = settings.api_server;
                     $('#api_url_text').val(api_server);
-                    
-                    charaCloudInit();
+
+                    if(api_server && settings.auto_connect && !is_colab) {
+                        setTimeout(function() {
+                            $('#api_button').click();
+                        }, 2000);
+                    }
+
+                    if(settings.characloud) {
+                        charaCloudInit();
+                    }
                     
                 }
                 if(!is_checked_colab) isColab();
@@ -3312,6 +3373,9 @@ $(document).ready(function(){
                     character_anchor: character_anchor,
                     lock_context_size: lock_context_size,
                     multigen: multigen,
+                    singleline: singleline,
+                    auto_connect: settings.auto_connect || false,
+                    characloud: settings.characloud === false ? false : true,
                     swipes: swipes,
                     keep_dialog_examples: keep_dialog_examples,
                     free_char_name_mode: free_char_name_mode,
@@ -3397,110 +3461,279 @@ $(document).ready(function(){
     }
     //********************
     //***Message Editor***
-    $(document).on('click', '.mes_edit', function(){
-        if(this_chid !== undefined){
-            let run_edit = true;
-            var edit_mes_id = $(this).parent().parent().parent().attr('mesid');
+    function messageRoot(anyChild) {
+        while(anyChild && anyChild.length && anyChild.attr && (anyChild.attr("mesid") === undefined || anyChild.attr("mesid") === null) && anyChild.parent) {
+            anyChild = anyChild.parent();
+        }
+        if(anyChild && anyChild.attr && anyChild.attr("mesid") !== undefined && anyChild.attr("mesid") !== null) {
+            return anyChild;
+        }
+        return null;
+    }
+    function toggleEdit(messageRoot, toState = false) {
+        if(!messageRoot) { return; }
+        messageRoot.find('.mes_edit').css("display", toState ? "none": "block");
+        const editBlock = messageRoot.find('.edit_block');
+        editBlock.css("display", toState ? "block" : "none");
+        if(toState) {
+            editBlock.css("opacity", 0);
+            editBlock.transition({
+                opacity: 1.0,
+                duration: 600,
+                easing: "",
+                complete: function() {  }
+            });
+        }
+    }
+    function recalculateChatMesids() {
+        const childs = $('#chat')[0].childNodes;
+        for(let index = 0; index < childs.length; index++) {
+            const child = childs[index];
+            child.setAttribute("mesid", index);
+            child.setAttribute("class", index === childs.length - 1 ? "mes last_mes" : "mes");
+        }
+    }
 
-            if(edit_mes_id == count_view_mes-1){ //if the generating swipe (...)
-                if(chat[edit_mes_id]['swipe_id'] !== undefined){
-                    if(chat[edit_mes_id]['swipes'].length === chat[edit_mes_id]['swipe_id']){
-                        run_edit = false;
-                    }
-                }
-                if(run_edit){
-                    hideSwipeButtons();
+    $(document).on('click', '.mes_edit', function(){
+        if(this_chid == undefined){
+            return;
+        }
+        let run_edit = true;
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        const edit_mes_id = root ? parseInt(root.attr("mesid")) : NaN;
+        if(isNaN(edit_mes_id)) { return; }
+        if(this_edit_mes_id !== undefined) { return; }
+
+        if(edit_mes_id == count_view_mes-1){ //if the generating swipe (...)
+            if(chat[edit_mes_id]['swipe_id'] !== undefined){
+                if(chat[edit_mes_id]['swipes'].length === chat[edit_mes_id]['swipe_id']){
+                    run_edit = false;
                 }
             }
             if(run_edit){
-                let chatScrollPosition = $("#chat").scrollTop();
-                if(this_edit_mes_id !== undefined){
-                    let mes_edited = $('#chat').children().filter('[mesid="'+this_edit_mes_id+'"]').children('.mes_block').children('.ch_name').children('.mes_edit_done');
-                    messageEditDone(mes_edited);
-                }
-                $(this).parent().parent().children('.mes_text').empty();
-                $(this).css('display','none');
-                $(this).parent().children('.mes_edit_done').css('display','inline-block');
-                $(this).parent().children('.mes_edit_done').css('opacity',0.0);
-                $(this).parent().children('.mes_edit_cancel').css('display','inline-block');
-                $(this).parent().children('.mes_edit_cancel').css('opacity',0.0);
-                $(this).parent().children('.mes_edit_done').transition({  
-                        opacity: 1.0,
-                        duration: 600,
-                        easing: "",
-                        complete: function() {  }
-                });
-                $(this).parent().children('.mes_edit_cancel').transition({  
-                        opacity: 1.0,
-                        duration: 600,
-                        easing: "",
-                        complete: function() {  }
-                });
+                hideSwipeButtons();
+            }
+        }
+        if(run_edit){
+            let chatScrollPosition = $("#chat").scrollTop();
+            if(this_edit_mes_id !== undefined){
+                let mes_edited = $('#chat').children().filter('[mesid="'+this_edit_mes_id+'"]').children('.mes_block').children('.ch_name').children('.mes_edit_done');
+                messageEditDone(mes_edited);
+            }
+            root.find('.mes_text').empty();
+            toggleEdit(root, true);
+            this_edit_mes_id = edit_mes_id;
+            root.find('.mes_up').attr('class', this_edit_mes_id == 0 ? "mes_up disabled" : "mes_up");
+            root.find('.mes_down').attr('class', this_edit_mes_id == chat.length - 1 ? "mes_down disabled" : "mes_down");
 
-                this_edit_mes_id = edit_mes_id;
+            if(chat[this_edit_mes_id].chid === undefined && !chat[this_edit_mes_id].is_user) {
+                chat[this_edit_mes_id].chid = parseInt(this_chid);
+            }
 
-                var text = chat[edit_mes_id]['mes'];
-                if(chat[edit_mes_id]['is_user']){
-                    this_edit_mes_chname = name1;
-                }else{
-                    this_edit_mes_chname = name2;
-                }
-                text = text.trim();
-                $(this).parent().parent().children('.mes_text').append('<textarea class=edit_textarea>'+text+'</textarea>');
-                let edit_textarea = $(this).parent().parent().children('.mes_text').children('.edit_textarea');
-                edit_textarea.css('opacity',0.0);
-                edit_textarea.transition({  
-                        opacity: 1.0,
-                        duration: 0,
-                        easing: "",
-                        complete: function() {  }
-                });
-                edit_textarea.height(0);
-                edit_textarea.height(edit_textarea[0].scrollHeight);
-                edit_textarea.focus();
-                edit_textarea[0].setSelectionRange(edit_textarea.val().length, edit_textarea.val().length);
-                if(this_edit_mes_id == count_view_mes-1 || true){
-                    console.log(1);
-                    $("#chat").scrollTop(chatScrollPosition);
-                }
+            let nameSelect = root.find(".name_select");
+                nameSelect.css("display", "block");
+                nameSelect.empty();
+                nameSelect.append('<option value="-1" class="player"'+ (chat[this_edit_mes_id].is_user ? " selected=\"selected\"" : "") +'>'+name1+'</option>');
+                nameSelect.append('<option value="'+this_chid+'" class="host"'+ (chat[this_edit_mes_id].chid == parseInt(this_chid) ? " selected=\"selected\"" : "") +'>'+name2+'</option>');
+            root.find(".ch_name").css("display", "none");
+
+            var text = chat[edit_mes_id]['mes'];
+            if(chat[edit_mes_id]['is_user']){
+                this_edit_mes_chname = name1;
+            }else{
+                this_edit_mes_chname = name2;
+            }
+            text = text.trim();
+            const mesText = root.find('.mes_text');
+            let edit_textarea = $('<textarea class=edit_textarea>'+text+'</textarea>');
+            mesText.append(edit_textarea);
+            edit_textarea.css('opacity',0.0);
+            edit_textarea.transition({
+                    opacity: 1.0,
+                    duration: 0,
+                    easing: "",
+                    complete: function() {  }
+            });
+            edit_textarea.height(0);
+            edit_textarea.height(edit_textarea[0].scrollHeight);
+            edit_textarea.focus();
+            edit_textarea[0].setSelectionRange(edit_textarea.val().length, edit_textarea.val().length);
+            if(this_edit_mes_id == count_view_mes-1 || true){
+                //console.log(1);
+                $("#chat").scrollTop(chatScrollPosition);
             }
         }
     });
-    $(document).on('click', '.mes_edit_cancel', function(){
-        showSwipeButtons();
-        //var text = $(this).parent().parent().children('.mes_text').children('.edit_textarea').val();
-        var text = chat[this_edit_mes_id]['mes'];
+    $(document).on('click', '.mes_edit_clone', function(){
+        if(!confirm("Make a copy of this message?")) { return; }
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        let oldScroll = $('#chat')[0].scrollTop;
+        let clone = JSON.parse(JSON.stringify(chat[this_edit_mes_id]));
+        clone.send_date++;
 
-        $(this).parent().parent().children('.mes_text').empty();
-        $(this).css('display','none');
-        $(this).parent().children('.mes_edit_done').css('display','none');
-        $(this).parent().children('.mes_edit').css('display','inline-block');
-        $(this).parent().parent().children('.mes_text').append(messageFormating(text,this_edit_mes_chname));
+        let nameSelect = root.find('.name_select');
+        let authorId = parseInt(nameSelect.val());
+        clone.is_user = authorId < 0;
+        clone.chid = authorId < 0 ? undefined : authorId;
+        clone.name = authorId < 0 ? name1 : characters[authorId].name;
+        clone.mes = root.find('.mes_text').children('.edit_textarea').val().trim();
+
+        chat.splice(this_edit_mes_id+1, 0, clone);
+        root.after(addOneMessage(clone));
+        recalculateChatMesids();
+        saveChat();
+        $('#chat')[0].scrollTop = oldScroll;
+    });
+    $(document).on('click', '.mes_edit_delete', function(){
+        if(!confirm("Are you sure you want to delete this message?")) { return; }
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        chat.splice(this_edit_mes_id, 1);
+        this_edit_target_id = undefined;
         this_edit_mes_id = undefined;
+        root.remove();
+        count_view_mes--;
+        recalculateChatMesids();
+        saveChat();
+        hideSwipeButtons();
+        showSwipeButtons();
+    });
+    $(document).on('click', '.mes_up', function(){
+        if(this_edit_mes_id <= 0 && this_edit_target_id === undefined) { return; }
+        this_edit_mes_id = parseInt(this_edit_mes_id);
+        if(this_edit_target_id === undefined) {
+            this_edit_target_id = this_edit_mes_id - 1;
+        } else {
+            this_edit_target_id--;
+        }
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        root.attr('mesid', this_edit_target_id);
+        root.prev().attr('mesid', this_edit_target_id+1);
+        root.insertBefore(root.prev());
+        $(this).parent().children('.mes_up').attr('class', this_edit_target_id == 0 ? "mes_up disabled" : "mes_up");
+        $(this).parent().children('.mes_down').attr('class', this_edit_target_id == chat.length - 1 ? "mes_down disabled" : "mes_down");
+    });
+    $(document).on('click', '.mes_down', function(){
+        if(this_edit_mes_id >= chat.length-1 && this_edit_target_id === undefined) { return; }
+        this_edit_mes_id = parseInt(this_edit_mes_id);
+        if(this_edit_target_id === undefined) {
+            this_edit_target_id = this_edit_mes_id + 1;
+        } else {
+            this_edit_target_id++;
+        }
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        root.attr('mesid', this_edit_target_id);
+        root.next().attr('mesid', this_edit_target_id-1);
+        root.insertAfter(root.next());
+        $(this).parent().children('.mes_up').attr('class', this_edit_target_id == 0 ? "mes_up disabled" : "mes_up");
+        $(this).parent().children('.mes_down').attr('class', this_edit_target_id == chat.length - 1 ? "mes_down disabled" : "mes_down");
+    });
+    $(document).on('change', '.name_select', function(){
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        let to_chid = parseInt($(this).val());
+        let toAvatar = to_chid < 0 ? "User Avatars/" + user_avatar : "characters/" + characters[to_chid].avatar;
+        root.find(".avt_img").attr("src", toAvatar + "#t=" + Date.now());
+    });
+    $(document).on('click', '.mes_edit_cancel', function(){
+        hideSwipeButtons();
+        const mes = chat[this_edit_mes_id];
+        const text = mes.mes;
+
+        const root = messageRoot($(this));
+        if(!root) { return; }
+        toggleEdit(root, false);
+
+        root.find('.avt_img').attr("src", getMessageAvatar(mes));
+        let nameSelect = root.find('.name_select');
+            nameSelect.empty();
+            nameSelect.css("display", "none");
+        root.find('.ch_name').css("display", "block");
+        root.find('.mes_text').empty();
+        root.find('.mes_text').append(messageFormating(text,this_edit_mes_chname));
+        if(this_edit_target_id !== undefined && this_edit_target_id !== null && this_edit_target_id !== this_edit_mes_id) {
+            $('#chat')[0].insertBefore($('#chat')[0].childNodes[this_edit_target_id], $('#chat')[0].childNodes[this_edit_mes_id < this_edit_target_id ? this_edit_mes_id : this_edit_mes_id+1]);
+            recalculateChatMesids();
+        }
+        this_edit_target_id = undefined;
+        this_edit_mes_id = undefined;
+        showSwipeButtons();
     });
     $(document).on('click', '.mes_edit_done', function(){
         showSwipeButtons();
         messageEditDone($(this));
     });
     function messageEditDone(div){
-        showSwipeButtons();
-        var text = div.parent().parent().children('.mes_text').children('.edit_textarea').val();
-        //var text = chat[this_edit_mes_id];
+        const root = messageRoot(div);
+        if(!root) { return; }
+        hideSwipeButtons();
+        var text = root.find('.mes_text').children('.edit_textarea').val();
+        const message = chat[this_edit_mes_id];
         text = text.trim();
-        chat[this_edit_mes_id]['mes'] = text;
-        if(chat[this_edit_mes_id]['swipe_id'] !== undefined){
-            chat[this_edit_mes_id]['swipes'][chat[this_edit_mes_id]['swipe_id']] = text;
+        message.mes = text;
+
+        let nameSelect = root.find('.name_select');
+        let authorId = parseInt(nameSelect.val());
+        message.is_user = authorId < 0;
+        message.chid = authorId < 0 ? undefined : authorId;
+        message.name = authorId < 0 ? name1 : characters[authorId].name;
+        nameSelect.empty();
+        nameSelect.css("display", "none");
+        let chName = root.find('.ch_name');
+            chName.html(message.name);
+            chName.css("display", "block");
+
+        if(message['swipe_id'] !== undefined){
+            message['swipes'][message['swipe_id']] = text;
         }
-        div.parent().parent().children('.mes_text').empty();
-        div.css('display','none');
-        div.parent().children('.mes_edit_cancel').css('display','none');
-        div.parent().children('.mes_edit').css('display','inline-block');
-        div.parent().parent().children('.mes_text').append(messageFormating(text,this_edit_mes_chname));
+        root.find('.mes_text').empty();
+        toggleEdit(root, false);
+        root.find('.mes_text').append(messageFormating(text,this_edit_mes_chname));
+        if(this_edit_target_id !== undefined && this_edit_target_id !== this_edit_mes_id) {
+            let date = message.send_date;
+            chat.splice(this_edit_target_id, 0, chat.splice(this_edit_mes_id, 1)[0]);
+            if(this_edit_target_id < this_edit_mes_id) {
+                for(let i = this_edit_target_id; i < this_edit_mes_id; i++) {
+                    chat[i].send_date = chat[i+1].send_date;
+                }
+                message.send_date = date;
+            } else {
+                for(let i = this_edit_target_id; i > this_edit_mes_id; i--) {
+                    chat[i].send_date = chat[i-1].send_date;
+                }
+                message.send_date = date;
+            }
+            for(let i = 0; i < div.parent().parent().parent().parent().children().length; i++) {
+                div.parent().parent().parent().parent().children().eq(i).attr("mesid", i);
+            }
+        }
+        showSwipeButtons();
+        this_edit_target_id = undefined;
         this_edit_mes_id = undefined;
         saveChat();
     }
     //********************
     //***Swipes***
+    $(document).keydown(function(e) {
+        if (($(document.activeElement).is('#send_textarea') && $('#send_textarea').val().length === 0) || !$('textarea:focus, input[type="text"]:focus').length) {
+            if (e.keyCode == 37) {
+                // Left arrow key pressed
+                if(JSON.parse($('#chat').children('.mes').last().attr('is_user')) === false && $('#chat').children('.mes').last().children('.swipe_left').css('display') !== 'none'){
+                    $('#chat').children('.mes').last().children('.swipe_left').click();
+                }
+            } else if (e.keyCode == 39) {
+                // Right arrow key pressed
+                if(JSON.parse($('#chat').children('.mes').last().attr('is_user')) === false && $('#chat').children('.mes').last().children('.swipe_right').css('display') !== 'none'){
+                    $('#chat').children('.mes').last().children('.swipe_right').click();
+
+                }
+            }
+        }
+    });
     $(document).on('click', '.swipe_right', function(){
         const swipe_duration = 120;
         const swipe_range = '700px';
@@ -4093,7 +4326,7 @@ $(document).ready(function(){
     //**************************************************************//
     //**************************CHARA CLOUD*************************//
     $('#chat_header_back_button').click(function(){
-        if(charaCloud.isOnline() && charaCloudMode){
+        if(charaCloud.isOnline() && settings.characloud){
             $('#shell').css('display', 'none');
             $('#chara_cloud').css('display', 'block');
             $('#chara_cloud').css('opacity', 0.0);
@@ -4131,7 +4364,7 @@ $(document).ready(function(){
 
     characloud_characters_rows = [];
     async function charaCloudInit(){
-        if(charaCloudMode){
+        if(settings.characloud){
             charaCloudServerStatus();
             
             let characloud_characters_board = await charaCloud.getAllCharacters();
@@ -4445,4 +4678,31 @@ $(document).ready(function(){
 
 });
 
+document.getElementsByName("search_bar")[0].addEventListener('keyup', search_chars);
+function search_chars(){
+    const character_list = document.querySelector('#rm_print_charaters_block').querySelectorAll('div.character_select');
+    for (let i = 0; i < character_list.length; i++) {
+        character_list[i].style.display = "";
+        if (character_list[i].textContent.toLowerCase().indexOf(this.value)<0){
+            character_list[i].style.display = "none";
+        }
+    }
+}
+/*
+function auto_start(){
+    //console.log(main_api.value)
 
+    if (main_api.value == "openai"){
+        document.getElementById("api_button_openai").click()
+    }
+    else if (main_api.value == "novel"){
+        document.getElementById("api_button_novel").click()
+    }
+    else if (main_api.value == "kobold"){
+        document.getElementById("api_button").click()
+    }
+}
+$(document).ready(function() {
+    setTimeout(auto_start, 500)
+})
+ * */

@@ -381,3 +381,10 @@ label.checkbox :checked + span {
   background:#181717;
 
 }
+/*searchbox*/
+#search_bar  {
+    background-color: #181717;
+}
+#search_bar::placeholder  {
+    color: white;
+}
