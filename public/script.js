@@ -440,7 +440,7 @@ $(document).ready(function(){
         characters.forEach(function(item, i, arr) {
             var this_avatar = default_avatar;
             if(item.avatar != 'none'){
-                this_avatar = "characters/"+item.avatar+"?v="+Date.now();
+                this_avatar = "characters/"+item.avatar;
 
             }
             $("#rm_print_charaters_block").prepend('<div class=character_select chid='+i+'><div class=avatar><img src="'+this_avatar+'"></div><div class=ch_name_menu>'+item.name+'</div></div>');
@@ -1691,7 +1691,7 @@ $(document).ready(function(){
         if(characters[chid].avatar != 'none'){
                 this_avatar = "characters/"+characters[chid].avatar;
         }
-        $("#avatar_load_preview").attr('src',this_avatar+"?v="+Date.now());
+        $("#avatar_load_preview").attr('src',this_avatar);
         $("#name_div").css("display", "none");
 
         $("#form_create").attr("actiontype", "editcharacter");
