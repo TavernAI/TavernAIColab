@@ -454,9 +454,9 @@ $(document).ready(function(){
         const response = await fetch("/getcharacters", {
             method: "POST",
             headers: {
-                                        "Content-Type": "application/json",
-                                        "X-CSRF-Token": token
-                                },
+                "Content-Type": "application/json",
+                "X-CSRF-Token": token
+                },
             body: JSON.stringify({
                         "": ""
                     })
@@ -473,7 +473,7 @@ $(document).ready(function(){
 
                 characters[i] = [];
                 characters[i] = getData[i];
-                
+                characters[i]['name'] = DOMPurify.sanitize(characters[i]['name']);
                 if(characters[i].add_date === undefined){
                     characters[i].add_date = characters[i].create_date;
                 }
@@ -747,7 +747,8 @@ $(document).ready(function(){
         }
     });
     async function Generate(type) {//encode("dsfs").length
-        const gap_holder = 120;
+        let gap_holder = 120;
+        if(main_api === 'openai' && (model_openai === 'gpt-3.5-turbo' || model_openai === 'gpt-3.5-turbo-0301')) gap_holder = parseInt(amount_gen_openai);
         var textareaText = '';
         tokens_already_generated = 0;
         if(!free_char_name_mode){
