@@ -2638,6 +2638,10 @@ label.wpp_label {
     text-align: left;
     margin-left: 1ex;
 }
+#hordeQueue:before {
+    text-align: right;
+    content: "Queue position: "
+}
 
 
 
