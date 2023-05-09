@@ -2445,6 +2445,23 @@ label.wpp_label {
     border-radius: 1ex;
     margin-right: 1ex;
 }
+
+#world_info_settings input {
+    display: block;
+    background-color: #13152c;
+    box-shadow: 0 0 2px rgba(200,200,200,0.5);
+    border: 0px solid grey;
+    color: #ffffffaa;
+    padding: 0.5ex;
+    padding-left: 0.5ex;
+    margin-left: 3px;
+    margin-bottom: 1em;
+    width: 284px;
+    height: 30px;
+    padding-left: 10px;
+    margin-right: auto;
+}
+
 .keys-editor > input.empty, .secondary-keys-editor > input.empty {
     opacity: 0.5;
 }
@@ -2621,10 +2638,6 @@ label.wpp_label {
     text-align: left;
     margin-left: 1ex;
 }
-#hordeQueue:before {
-    text-align: right;
-    content: "Queue position: "
-}
 
 
 
@@ -2767,6 +2780,68 @@ label.wpp_label {
     }
     .nav {
       width: 100%;
+      min-width: 0px;
       box-shadow: none
+    }
+
+    #chara_cloud {
+        margin-left: 10px;
+        margin-right: 0px;
+        width: 100%;
+    }
+
+    #characloud_search_form {
+        overflow-x: scroll;
+    }
+
+    #bg_menu {
+        position: relative;
+    }
+
+    #logo_block {
+        width: 40%;
+    }
+
+    #api_button {
+        margin-top: 5px;
+        display: block;
+    }
+
+    #master_settings_popup {
+        height: 95vh;
+    }
+
+    #master_settings_koboldai_block {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #master_settings_novelai_block {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #master_settings_openai_block .master_settings_range_block {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #master_settings_toggle_block {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .mes {
+        margin-bottom: 5px;;
+    }
+
+    .style_button {
+        width: 30px;
+        height: 30px;
+    }
+
+    .style_button img {
+        width: 100%;
+        height: 100%;
     }
 }
