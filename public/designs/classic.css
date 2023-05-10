@@ -1364,6 +1364,7 @@ label form {
 }
 
 #colab_shadow_popup {
+    display: block;
     z-index: 2298;
 }
 #colab_popup_text {
