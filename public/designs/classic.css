@@ -1364,7 +1364,6 @@ label form {
 }
 
 #colab_shadow_popup {
-    display: block;
     z-index: 2298;
 }
 #colab_popup_text {
@@ -2637,10 +2636,6 @@ label.wpp_label {
 #hordeQueue {
     text-align: left;
     margin-left: 1ex;
-}
-#hordeQueue:before {
-    text-align: right;
-    content: "Queue position: "
 }
 
 
