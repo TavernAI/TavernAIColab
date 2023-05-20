@@ -647,9 +647,9 @@ $(document).ready(function(){
                     $("#main_api").val("kobold");
                     $("#main_api").change();
                     if(String(getData.colaburl).indexOf('cloudflare')){
-                        url = String(getData.colaburl).split("flare.com")[0] + "flare.com";
+                        url = String(getData.colaburl).split("flare.com")[0] + "";
                     }else{
-                        url = String(getData.colaburl).split("loca.lt")[0] + "loca.lt";
+                        url = String(getData.colaburl).split("loca.lt")[0] + "";
                     }
                     $('#api_url_text').val(url);
                     setTimeout(function () {
