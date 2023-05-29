@@ -1,18 +1,64 @@
 import {encode, decode} from "../scripts/gpt-2-3-tokenizer/mod.js";
 import {Notes} from "./class/Notes.mjs";
 import {WPP} from "./class/WPP.mjs";
-import {WPPEditor} from "./class/WPPEditor.mjs";
-import { CharactersClass } from './class/Characters.js';
 import {UIWorldInfoMain} from "./class/UIWorldInfoMain.mjs";
-
-
+import {CharacterModel} from "./class/CharacterModel.mjs";
+import {CharacterView} from "./class/CharacterView.mjs";
 
 var token;
+var data_delete_chat = {};
 var default_avatar = 'img/fluffy.png';
+var requestTimeout = 60*1000;
+var max_context = 2048;//2048;
+export var characterFormat = 'webp';
 function vl(text) { //Validation security function for html
-    return window.DOMPurify.sanitize(text);
+    return !text ? text : window.DOMPurify.sanitize(text);
 }
-export {token, default_avatar, vl};
+function filterFiles(dataTransferItems, types = []) {
+    types = types.map(v => v.toString().toLowerCase());
+    let filtered = [];
+    for(let i = 0; i < dataTransferItems.length; i++) {
+        if(!types.length || types.indexOf(dataTransferItems[i].type.toLowerCase()) >= 0) {
+            filtered.push(dataTransferItems[i]);
+        }
+    }
+    return filtered;
+}
+/* TODO: temporary; this should be handled by a general UI manager of some kind */
+export function characterAddedSign(file_name, alert_text = 'Character created'){
+    $('#rm_info_block').transition({opacity: 0, duration: 0});
+    var $prev_img = $('#avatar_div_container').clone();
+    if(file_name) {
+        $prev_img.children('img').attr('src', 'characters/'+file_name+'.'+characterFormat);
+    } else {
+        $prev_img.children('img').attr('src', 'img/fluffy.png');
+    }
+    $('#rm_info_avatar').append($prev_img);
+    select_rm_info(alert_text);
+
+    $('#rm_info_block').transition({opacity: 1.0, duration: 2000});
+}
+export function select_rm_info(text){
+    $( "#rm_charaters_block" ).css("display", "none");
+    $( "#rm_api_block" ).css("display", "none");
+    $( "#rm_ch_create_block" ).css("display", "none");
+    $( "#rm_info_block" ).css("display", "flex");
+
+    $("#rm_info_text").html('<h3>'+text+'</h3>');
+
+    $( "#rm_button_characters" ).children("h2").removeClass('seleced_button_style');
+    $( "#rm_button_characters" ).children("h2").addClass('deselected_button_style');
+
+    $( "#rm_button_settings" ).children("h2").removeClass('seleced_button_style');
+    $( "#rm_button_settings" ).children("h2").addClass('deselected_button_style');
+
+    $( "#rm_button_selected_ch" ).children("h2").removeClass('seleced_button_style');
+    $( "#rm_button_selected_ch" ).children("h2").addClass('deselected_button_style');
+}
+
+export {token, default_avatar, vl, filterFiles, requestTimeout, max_context};
+export var animation_rm_duration = 200;
+export var animation_rm_easing = "";
 $(document).ready(function(){
     /*
     const observer = new MutationObserver(function(mutations) {
@@ -43,17 +89,102 @@ $(document).ready(function(){
     const config = { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] };
     observer.observe(document.body, config);
     */
-   
-    var Characters = new CharactersClass();
+    
+    var Characters = new CharacterModel({
+        container: document.getElementById("rm_print_charaters_block"),
+        input: {
+            newCharacter: document.getElementById("rm_button_create"),
+            addFolder: [ document.getElementById("character-button-new-folder") ],
+            importFiles: [ document.getElementById("character-button-import") ],
+            sortSelect: document.getElementById("rm_folder_order"),
+            searchInput: document.getElementById("rm_search_bar"),
+        },
+        containerEditor: document.getElementById("form_create"),
+        containerEditorAdvanced: document.getElementById("shadow_charedit_advanced_popup"),
+    });
+    Characters.on(CharacterModel.EVENT_WIPE_CHAT, function() {
+        clearChat();
+        chat.length = 0;
+        printMessages();
+    }.bind(this));
+    Characters.on(CharacterView.EVENT_CHARACTER_SELECT, function(event){
 
+        if (Characters.selectedID >= 0 && Characters.id[Characters.selectedID].online === true) {
+            $('#character_online_editor').attr('value', '🢤 Online Editor');
+            document.getElementById("chat_header_char_info").innerHTML = ' designed by <a user_name="' + Characters.id[Characters.selectedID].user_name + '" class="chat_header_char_info_user_name">' + vl(Characters.id[Characters.selectedID].user_name_view) + '</a>';
+        } else {
+            $('#character_online_editor').attr('value', '🢤 Publish Card');
+            $('#chat_header_char_info').text('designed by User');
+        }
+        $('#chat_header_char_name').text(Characters.id[Characters.selectedID].name);
+        this_edit_mes_id = undefined;
+        selected_button = 'character_edit';
+        $('#chat_header_back_button').css('display', 'block');
+        clearChat();
+        chat.length = 0;
+        getChat();
+        if($('#characloud_character_page').css('display') === 'none' && $('#characloud_user_profile_block').css('display') === 'none' || $('#chara_cloud').css('display') === 'none'){
+            hideCharaCloud();
+        }
+        
+
+    }.bind(this));
+    Characters.on(CharacterModel.EVENT_EDITOR_CLOSED, function(event) {
+        selected_button = 'characters';
+        select_rm_characters();
+    }.bind(this));
+    Characters.on(CharacterModel.EVENT_CHARACTER_UPDATED, function(event) {
+        clearChat();
+        chat.length = 0;
+        getChat();
+    }.bind(this));
+    
+    //Drag drop import characters
+    $("body").on('dragenter', function (e) {
+        if (is_mobile_user) {
+            return;
+        }
+        e.preventDefault();
+        if (e.originalEvent.dataTransfer.types) {
+            if (e.originalEvent.dataTransfer.types[1] === "Files" || e.originalEvent.dataTransfer.types[0] === "Files") {
+                $('#drag_drop_shadow').css('display', 'flex');
+            }
+        }
+
+    });
+
+    $("body").on('dragover', function (e) {
+        if (is_mobile_user) {
+            return;
+        }
+        e.preventDefault();
+    });
+    $("body").on('dragleave', function (e) {
+        if (is_mobile_user) {
+            return;
+        }
+        e.preventDefault();
+        if (e.relatedTarget !== this && !$.contains(this, e.relatedTarget)) {
+            $('#drag_drop_shadow').css('display', 'none');
+        }
+    });
+
+    $("body").on('drop', function (e) {
+        if (is_mobile_user) {
+            return;
+        }
+        e.preventDefault();
+        $('#drag_drop_shadow').css('display', 'none');
+    });
+    
     //CharaCloud
     var charaCloud = charaCloudClient.getInstance();
     var characloud_characters = [];
     var characloud_characters_rows;
     var charaCloudServer = 'http://127.0.0.1:80';
     ///////////
-    const VERSION = '1.4.0';
-    var converter = new showdown.Converter({ extensions: ['xssfilter'] })
+    const VERSION = '1.4.1';
+    var converter = new showdown.Converter({ extensions: ['xssfilter'] });
     var bg_menu_toggle = false;
     var default_user_name = "You";
     var name1 = default_user_name;
@@ -81,7 +212,6 @@ $(document).ready(function(){
     var is_checked_colab = false;
     var is_mes_reload_avatar = false;
     var is_nav_toggle = false;
-    var characterFormat = 'webp';
     
     var is_advanced_char_open = false;
     var is_master_settings_open = false;
@@ -101,8 +231,6 @@ $(document).ready(function(){
     var timerSaveEdit;
     var durationSaveEdit = 300;
     //animation right menu
-    var animation_rm_duration = 200;
-    var animation_rm_easing = "";
 
     var popup_type = "";
     var bg_file_for_del = '';
@@ -145,7 +273,6 @@ $(document).ready(function(){
     var typical = 1.0;
     var tfs = 1.0;
     var amount_gen = 80;
-    var max_context = 2048;//2048;
     var rep_pen = 1;
     var rep_pen_size = 100;
     var rep_pen_slope = 0.9;
@@ -174,7 +301,6 @@ $(document).ready(function(){
 
     var winNotes;
     var winWorldInfo;
-    var editorDescriptionWPP;
 
     var main_api = 'kobold';
     var generateType;
@@ -237,34 +363,24 @@ $(document).ready(function(){
     var is_mobile_user = navigator.userAgent.match(/Android/i) || navigator.userAgent.match(/iPhone/i);
     
     
-    var requestTimeout = 1*60*1000;
+    var character_sorting_type = 'NAME';
+    $("#rm_folder_order").change(function () {
+        character_sorting_type = $('#rm_folder_order').find(":selected").val();
+        setTimeout(saveSettings, 300);
+    });
     jQuery.ajax({
         type: "GET",
         url: "/timeout",
         cache: false,
         contentType: "application/json",
         success: function(data) {
-            requestTimeout = data.timeout;
+            setTimeout(data.timeout);
         },
         error: function (jqXHR, exception) {
             console.error(jqXHR);
             console.error(exception);
         }
     });
-    
-    editorDescriptionWPP = new WPPEditor({
-        container: $('#description_wppeditor')[0],
-    });
-    editorDescriptionWPP.on("change", function(event) {
-        $("#description_textarea").val(event.target.text);
-
-        if(menu_type == 'create'){
-            create_save_description = $('#description_textarea').val();
-        }else{
-            if(timerSaveEdit) { clearTimeout(timerSaveEdit) };
-            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-        }
-    }.bind(this));
 
 
     $('#send_textarea').on('input', function () {
@@ -331,7 +447,7 @@ $(document).ready(function(){
             complete: function () { }
         });
 
-        $('#rm_button_characters').click();
+        /*$('#rm_button_characters').click();*/
         $('#bg_chara_cloud').transition({
             opacity: 1.0,
             duration: 1000,
@@ -651,6 +767,8 @@ $(document).ready(function(){
                     }else{
                         url = String(getData.colaburl).split("loca.lt")[0] + "loca.lt";
                     }
+                    
+                    
                     $('#api_url_text').val(url);
                     setTimeout(function () {
                         $('#api_button').click();
@@ -931,6 +1049,9 @@ $(document).ready(function(){
             message_already_generated = '';
         }
         if(online_status != 'no_connection' && Characters.selectedID != undefined){
+            Characters.id[Characters.selectedID].last_action_date = Date.now();
+            $('#rm_folder_order').change();
+            Characters.thisCharacterSave();
             if(type === 'regenerate'){
                 textareaText = "";
                 if(chat[chat.length-1]['is_user']){//If last message from You
@@ -1177,8 +1298,12 @@ $(document).ready(function(){
                     this_max_context = 1024;
                 }else{
                     this_max_context = 2048-60;//fix for fat tokens 
-                    if(model_novel == 'krake-v2'){
+                    if(model_novel === 'krake-v2'){
                         this_max_context-=160;
+                    }
+                    if(model_novel === 'clio-v1'){
+                        this_max_context = 8192;
+                        this_max_context-=160;//fix for fat tokens 
                     }
                 }
             }
@@ -1635,6 +1760,7 @@ $(document).ready(function(){
                     getMessage = name2+": "+getMessage;
                 }
                 getMessage = getMessage.replace(/\n+$/, "");
+
                 message_already_generated +=getMessage;
 
                 if(message_already_generated.indexOf('You:') === -1 && message_already_generated.indexOf('<|endoftext|>') === -1 && tokens_already_generated < parseInt(this_max_gen) && getMessage.length > 0){
@@ -1651,10 +1777,12 @@ $(document).ready(function(){
                 getMessage = getMessage.replace(new RegExp('<BOT>', "g"), name2);
                 getMessage = getMessage.replace(new RegExp('You:', "g"), name1+':');
             }
+
             if(getMessage.indexOf(name1+":") != -1){
                 getMessage = getMessage.substr(0,getMessage.indexOf(name1+":"));
 
             }
+            
             if(getMessage.indexOf('<|endoftext|>') != -1){
                 getMessage = getMessage.substr(0,getMessage.indexOf('<|endoftext|>'));
 
@@ -1760,7 +1888,11 @@ $(document).ready(function(){
         jQuery.ajax({    
             type: 'POST', 
             url: '/getchat', 
-            data: JSON.stringify({ch_name: Characters.id[Characters.selectedID].name, file_name: Characters.id[Characters.selectedID].chat, card_filename: Characters.id[Characters.selectedID].filename}),
+            data: JSON.stringify({
+                ch_name: Characters.id[Characters.selectedID].name,
+                file_name: Characters.id[Characters.selectedID].chat,
+                card_filename: Characters.id[Characters.selectedID].filename
+            }),
             beforeSend: function(){
                 //$('#create_button').attr('value','Creating...'); 
             },
@@ -1809,7 +1941,6 @@ $(document).ready(function(){
     function getChatResult(){
         name2 = Characters.id[Characters.selectedID].name;
         if(chat.length > 1){
-
             chat.forEach(function(item, i) {
                 if(item['is_user']){
                     var str = item['mes'].replace(default_user_name+':', name1+':');
@@ -1817,20 +1948,15 @@ $(document).ready(function(){
                     chat[i]['name'] = name1;
                 }
             });
-
-
-        }else{
-            //console.log(characters[Characters.selectedID].first_mes);
-            chat[0] = {};
-            chat[0]['name'] = name2;
-            chat[0]['is_user'] = false;
-            chat[0]['is_name'] = true;
-            chat[0]['send_date'] = Date.now();
-            if(Characters.id[Characters.selectedID].first_mes != ""){
-                chat[0]['mes'] = Characters.id[Characters.selectedID].first_mes;
-            }else{
-                chat[0]['mes'] = default_ch_mes;
-            }
+        } else {
+            let first = Characters.id[Characters.selectedID].first_mes;
+            chat[0] = {
+                name: name2,
+                is_user: false,
+                is_name: true,
+                send_date: Date.now(),
+                mes: first && first.length ? first : default_ch_mes
+            };
         }
         printMessages();
         select_selected_character(Characters.selectedID);
@@ -1879,10 +2005,12 @@ $(document).ready(function(){
         selected_button = 'characters';
         select_rm_characters();
     });
+    /*
     $( "#rm_button_back" ).click(function() {
         selected_button = 'characters';
         select_rm_characters();
     });
+     */
     $( "#rm_button_create" ).click(function() {
         selected_button = 'create';
         select_rm_create();
@@ -1892,14 +2020,8 @@ $(document).ready(function(){
         select_selected_character(Characters.selectedID);
     });
     function select_rm_create(){
+        // menu buttons
         menu_type = 'create';
-        if(selected_button == 'create'){
-            if(create_save_avatar != ''){
-                $("#add_avatar_button").get(0).files = create_save_avatar;
-                read_avatar_load($("#add_avatar_button").get(0));
-            }
-
-        }
         $( "#rm_charaters_block" ).css("display", "none");
         $( "#rm_api_block" ).css("display", "none");
         $( "#rm_ch_create_block" ).css("display", "block");
@@ -1912,10 +2034,6 @@ $(document).ready(function(){
                 complete: function() {  }
         });
         $( "#rm_info_block" ).css("display", "none");
-
-        $( "#delete_button_div" ).css("display", "none");
-        $("#create_button").css("display", "block");
-        $("#create_button").attr("value", "Create");
         $('#result_info').html('&nbsp;');
         
         $( "#rm_button_characters" ).children("h2").removeClass('seleced_button_style');
@@ -1927,35 +2045,15 @@ $(document).ready(function(){
         $( "#rm_button_selected_ch" ).children("h2").removeClass('seleced_button_style');
         $( "#rm_button_selected_ch" ).children("h2").addClass('deselected_button_style');
 
-        // Reset W++ editor
-        document.getElementById("description_wpp_checkbox").checked = false;
-        document.getElementById("description_textarea").style.display = null;
-        document.getElementById("description_wppeditor").style.display = "none";
-        editorDescriptionWPP.clear();
-        editorDescriptionWPP.text = "";
+        $(".chareditor-button-close").css('display', 'block');
 
-        //create text poles
-        $("#rm_button_back").css("display", "inline-block");
-        $("#rm_button_import").css("display", "inline-block");
-        $("#character_popup_text_h3").text('Create character');
-        $("#character_name_pole").val(create_save_name);
-        $("#description_textarea").val(create_save_description);
-        $("#personality_textarea").val(create_save_personality);
-        $("#firstmessage_textarea").val(create_save_first_message);
-        $("#scenario_pole").val(create_save_scenario);
-        if($.trim(create_save_mes_example).length == 0){
-            $("#mes_example_textarea").val('<START>');
-        }else{
-            $("#mes_example_textarea").val(create_save_mes_example);
-        }
-        $("#avatar_div").css("display", "block");
-        $("#avatar_load_preview").attr('src',default_avatar);
-        $("#name_div").css("display", "block");
-
-        $("#form_create").attr("actiontype", "createcharacter");
+        $("#character_file_div").css('display', 'none');
+        // set editor to empty data, create mode
+        Characters.editor.chardata = {};
+        Characters.editor.editMode = false;
+        Characters.editor.show();
     }
     function select_rm_characters(){
-
         menu_type = 'characters';
         $( "#rm_charaters_block" ).css("display", "block");
         $('#rm_charaters_block').css('opacity',0.0);
@@ -1979,24 +2077,6 @@ $(document).ready(function(){
         $( "#rm_button_selected_ch" ).children("h2").removeClass('seleced_button_style');
         $( "#rm_button_selected_ch" ).children("h2").addClass('deselected_button_style');
         
-    }
-    function select_rm_info(text){
-        $( "#rm_charaters_block" ).css("display", "none");
-        $( "#rm_api_block" ).css("display", "none");
-        $( "#rm_ch_create_block" ).css("display", "none");
-        $( "#rm_info_block" ).css("display", "flex");
-
-        $("#rm_info_text").html('<h3>'+text+'</h3>');
-
-        $( "#rm_button_characters" ).children("h2").removeClass('seleced_button_style');
-        $( "#rm_button_characters" ).children("h2").addClass('deselected_button_style');
-        
-        $( "#rm_button_settings" ).children("h2").removeClass('seleced_button_style');
-        $( "#rm_button_settings" ).children("h2").addClass('deselected_button_style');
-        
-        $( "#rm_button_selected_ch" ).children("h2").removeClass('seleced_button_style');
-        $( "#rm_button_selected_ch" ).children("h2").addClass('deselected_button_style');
-        
         
     }
 
@@ -2005,11 +2085,8 @@ $(document).ready(function(){
     }
 
     function select_selected_character(chid){ //character select
-
         select_rm_create();
         menu_type = 'character_edit';
-        
-        
         
         $( "#delete_button_div" ).css("display", "block");
         $( "#rm_button_selected_ch" ).children("h2").removeClass('deselected_button_style');
@@ -2017,94 +2094,17 @@ $(document).ready(function(){
         var display_name = Characters.id[chid].name;
         $( "#rm_button_selected_ch" ).css('display', 'inline-block');
         $( "#rm_button_selected_ch" ).children("h2").text(display_name);
-
-        //create text poles
-        $("#rm_button_back").css("display", "none");
-        //$("#rm_button_import").css("display", "none");
-        $("#create_button").attr("value", "Save");
-        $("#create_button").css("display", "none");
-        var i = 0;
-
-        while(parseInt($( "#rm_button_selected_ch" ).css('width').replace('px', '')) > 170 && i < 100){
-            
-            display_name = display_name.slice(0,display_name.length-2);
-            $( "#rm_button_selected_ch" ).children("h2").text($.trim(display_name)+'...');
-            i++;
-        }
-
-        $("#add_avatar_button").val('');
-
-        $('#character_popup_text_h3').text(Characters.id[chid].name);
-        $("#character_name_pole").val(Characters.id[chid].name);
-        $("#description_textarea").val(Characters.id[chid].description);
-        $("#personality_textarea").val(Characters.id[chid].personality);
-        $("#firstmessage_textarea").val(Characters.id[chid].first_mes);
-        $("#scenario_pole").val(Characters.id[chid].scenario);
-        $("#mes_example_textarea").val(Characters.id[chid].mes_example);
-        $("#selected_chat_pole").val(Characters.id[chid].chat);
-        $("#create_date_pole").val(Characters.id[chid].create_date_local);
-        $("#chat_import_avatar_url").val(Characters.id[chid].filename);
-        $("#chat_import_character_name").val(Characters.id[chid].name);
         
-        $("#character_file_div").text(Characters.id[chid].filename);
+        $(".chareditor-button-close").css('display', 'none');
 
-        editorDescriptionWPP.clear();
-        editorDescriptionWPP.text = Characters.id[chid].description;
+        $("#character_file_div").css('display', 'block');
 
-        //$("#avatar_div").css("display", "none");
-        var this_avatar = default_avatar;
-        if(Characters.id[chid].filename != 'none'){
-                this_avatar = "characters/"+Characters.id[chid].filename;
-        }
-        $("#avatar_load_preview").attr('src',this_avatar+"?v="+Date.now());
-        $("#name_div").css("display", "none");
-
-        $("#form_create").attr("actiontype", "editcharacter");
+        
+        // set editor to edit mode
+        Characters.editor.chardata = Characters.id[chid];
+        Characters.editor.editMode = true;
+        Characters.editor.show();
     }
-    $(document).on('click', '#rm_print_charaters_block .character_select', function(){
-        if (Characters.id[$(this).attr("chid")].online === true) {
-            if (Characters.id[$(this).attr("chid")].user_name === login) {
-                $('#character_online_editor').val('🢤 Online Editor');
-            } else {
-                $('#character_online_editor').val('🢤 Online Editor');
-            }
-            $('#chat_header_char_info').html(`designed by <a user_name="${Characters.id[$(this).attr("chid")].user_name}" class="chat_header_char_info_user_name">${vl(Characters.id[$(this).attr("chid")].user_name_view)}</a>`);
-        } else {
-            $('#character_online_editor').val('🢤 Publish Card');
-            $('#chat_header_char_info').text('designed by User');
-        }
-        $('#chat_header_char_name').text(Characters.id[$(this).attr("chid")]['name']);
-        if(Characters.selectedID !== $(this).attr("chid")){
-            if(!is_send_press){
-               
-                this_edit_mes_id = undefined;
-                selected_button = 'character_edit';
-                Characters.selectedID = $(this).attr("chid");
-                
-                
-
-                $('#chat_header_back_button').css('display', 'block');
-                clearChat();
-                chat.length = 0;
-                getChat();
-
-            }
-        }else{
-            selected_button = 'character_edit';
-            select_selected_character(Characters.selectedID);
-        }
-        $('#bg_chara_cloud').transition({  
-            opacity: 0.0,
-            duration: 1200,
-            easing: "",
-            complete: function() {  }
-        });
-        if($('#characloud_character_page').css('display') === 'none' && $('#characloud_user_profile_block').css('display') === 'none'){
-            $('#shell').css('display', 'grid');
-            $('#chara_cloud').css('display', 'none');
-        }
-
-    });
     $('#shell').on('click', '.chat_header_char_info_user_name', function(){
         showCharaCloud();
         showUserProfile($(this).attr("user_name"));
@@ -2332,6 +2332,7 @@ $(document).ready(function(){
     $( "#master_settings_button" ).click(function() {
         if(!is_master_settings_open){
             is_master_settings_open = true;
+            /*
             if(is_advanced_char_open){
                 $("#character_cross").click();
                 $('#master_settings_popup').css('opacity', 1.0);
@@ -2341,6 +2342,10 @@ $(document).ready(function(){
                 $('#master_settings_popup').css('opacity', 0.0);
                 $('#master_settings_popup').transition({ opacity: 1.0 ,duration: animation_rm_duration, easing:animation_rm_easing});
             }
+            */
+            $('#master_settings_popup').css('display', 'grid');
+            $('#master_settings_popup').css('opacity', 0.0);
+            $('#master_settings_popup').transition({opacity: 1.0, duration: animation_rm_duration, easing: animation_rm_easing});
         }else{
             $("#master_settings_cross").click();
         }
@@ -2361,13 +2366,11 @@ $(document).ready(function(){
     
     $("#master_settings_cross").click(function() {
         is_master_settings_open = false;
-        if(!is_advanced_char_open){
-            $('#master_settings_popup').transition({ opacity: 0.0 ,duration: animation_rm_duration, easing:animation_rm_easing, complete: function(){
-                    $('#master_settings_popup').css('display', 'none');
+
+        $('#master_settings_popup').transition({opacity: 0.0, duration: animation_rm_duration, easing: animation_rm_easing, complete: function () {
+                $('#master_settings_popup').css('display', 'none');
             }});
-        }else{
-            $('#master_settings_popup').css('display', 'none');
-        }
+
     });
     $("#dialogue_popup_ok").click(function(){
         $("#shadow_popup").css('display', 'none');
@@ -2378,36 +2381,7 @@ $(document).ready(function(){
             return;
         }
         if(popup_type == 'del_ch'){
-            let filename = Characters.id[Characters.selectedID].filename;
-            jQuery.ajax({    
-                method: 'POST', 
-                url: '/deletecharacter',
-                beforeSend: function(){
-                    select_rm_info("Character deleted");
-
-                    //$('#create_button').attr('value','Deleting...'); 
-                },
-                data: JSON.stringify({
-                            filename: filename
-                        }),
-                cache: false,
-                dataType: "json",
-                contentType: "application/json",
-                processData: false, 
-                timeout: requestTimeout,
-                success: function(html){
-                    Characters.id[Characters.selectedID] = {};
-                    $(`#rm_print_charaters_block .character_select[chid="${Characters.selectedID}"]`).remove();
-                    Characters.selectedID = undefined;
-                    $('#rm_button_selected_ch').css('display', 'none');
-                    $('#rm_button_characters').click();
-                    clearChat();
-                    chat.length = 0;
-                    printMessages();
-                    //getCharacters();
-                    //$('#create_button_div').html(html);  
-                }  
-            }); 
+            Characters.deleteCharacter(Characters.id[Characters.selectedID].filename );
             return;
         }
         if(popup_type == 'del_ch_characloud'){
@@ -2499,6 +2473,29 @@ $(document).ready(function(){
                 return;
             });
         }
+        if(popup_type === 'delete_chat'){
+            jQuery.ajax({
+                type: 'POST', // 
+                url: '/deletechat', // 
+                data: JSON.stringify(data_delete_chat),
+                beforeSend: function () {
+                    //$('#create_button').attr('value','Creating...'); 
+                },
+                cache: false,
+                timeout: requestTimeout,
+                dataType: "json",
+                contentType: "application/json",
+                success: function (data) {
+                    $('div.select_chat_block[file_name="'+data_delete_chat.chat_file+'"]').remove();
+
+                },
+                error: function (jqXHR, exception) {
+                    console.log(exception);
+                    console.log(jqXHR);
+                    callPopup(exception, 'alert_error');
+                }
+            });
+        }
     });
     $("#dialogue_popup_cancel").click(function(){
         $("#shadow_popup").css('display', 'none');
@@ -2506,7 +2503,7 @@ $(document).ready(function(){
         popup_type = '';
     });
     function callPopup(text = '', type){
-        
+
         popup_type = type;
         $("#dialogue_popup_cancel").css("display", "inline-block");
         switch(popup_type){
@@ -2617,214 +2614,12 @@ $(document).ready(function(){
         read_bg_load(this);
 
     });
-    function read_avatar_load(input) {
-        if (input.files && input.files[0]) {
-            var reader = new FileReader();
-            if(selected_button == 'create'){
-                create_save_avatar = input.files;
-            }
-            reader.onload = function (e) {
-
-                if(selected_button == 'character_edit'){
-
-                    timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-                }
-                $('#avatar_load_preview')
-                    .attr('src', e.target.result);
-                    //.width(103)
-                    //.height(83);
-            //console.log(e.target.result.name);   
-
-            };
-
-            reader.readAsDataURL(input.files[0]);
-        }
-    }
-    $("#add_avatar_button").change(function(){
-        is_mes_reload_avatar = Date.now();
-        read_avatar_load(this);
-    });
-    $( "#form_create" ).submit(function(e) {
-        $('#rm_info_avatar').html('');
-        var formData = new FormData($("#form_create").get(0));
-        if($("#form_create").attr("actiontype") == "createcharacter"){
-
-            if($("#character_name_pole").val().length > 0){
-                jQuery.ajax({    
-                    type: 'POST', 
-                    url: '/createcharacter', 
-                    data: formData,
-                    beforeSend: function(){
-                        $('#create_button').attr('disabled',true);
-                        $('#create_button').attr('value','Creating...'); 
-                    },
-                    cache: false,
-                    timeout: requestTimeout,
-                    contentType: false,
-                    processData: false, 
-                    success: function(data){
-                        $('#character_cross').click();
-                        $("#character_name_pole").val('');
-                        create_save_name = '';
-                        $("#description_textarea").val('');
-                        create_save_description = '';
-                        $("#personality_textarea").val('');
-                        create_save_personality = '';
-                        $("#firstmessage_textarea").val('');
-                        create_save_first_message = '';
-
-                        $("#character_popup_text_h3").text('Create character');
-
-                        $("#scenario_pole").val('');
-                        create_save_scenario = '';
-                        $("#mes_example_textarea").val('');
-                        create_save_mes_example = '';
-
-                        create_save_avatar = '';
-
-                        $('#create_button').removeAttr("disabled");
-                        $("#add_avatar_button").replaceWith($("#add_avatar_button").val('').clone(true));
-                        $('#create_button').attr('value','Create');
-
-                        characterAddedSign(data.file_name, 'Character created');
-
-                    },
-                    error: function (jqXHR, exception) {
-                        $('#create_button').removeAttr("disabled");
-                    }
-                });  
-            }else{
-                $('#result_info').html("Name not entered");
-            }
-        }else{
-            //console.log($("#add_avatar_button").val());
-            formData.append("filename", Characters.id[Characters.selectedID].filename);
-            jQuery.ajax({    
-                type: 'POST', 
-                url: '/editcharacter', 
-                data: formData,
-                beforeSend: function(){
-                    $('#create_button').attr('disabled',true);
-                    $('#create_button').attr('value','Save'); 
-                },
-                cache: false,
-                timeout: requestTimeout,
-                contentType: false,
-                processData: false, 
-                success: function(html){
-
-                    $('.mes').each(function(){
-                        if($(this).attr('ch_name') != name1){
-                            $(this).children('.avatar').children('img').attr('src', $('#avatar_load_preview').attr('src'));
-                        }
-                    });
-                    if(chat.length === 1 ){
-
-                        var this_ch_mes = default_ch_mes;
-                        if($('#firstmessage_textarea').val() != ""){
-                            this_ch_mes = $('#firstmessage_textarea').val();
-                        }
-                        if(this_ch_mes != $.trim($("#chat").children('.mes').children('.mes_block').children('.mes_text').text())){
-                            clearChat();
-                            chat.length = 0;
-                            chat[0] = {};
-                            chat[0]['name'] = name2;
-                            chat[0]['is_user'] = false;
-                            chat[0]['is_name'] = true;
-                            chat[0]['mes'] = this_ch_mes;
-                            add_mes_without_animation = true;
-                            addOneMessage(chat[0]);
-                        }
-                    }
-                    $('#create_button').removeAttr("disabled");
-                    Characters.loadAll();
-
-
-                    $("#add_avatar_button").replaceWith($("#add_avatar_button").val('').clone(true));
-                    $('#create_button').attr('value','Save');
-
-                    var count_tokens = getTokenCount(Characters.id[Characters.selectedID].description+Characters.id[Characters.selectedID].personality+Characters.id[Characters.selectedID].scenario+Characters.id[Characters.selectedID].mes_example);
-                    const alert_context_size_gap = 400;
-                    if((count_tokens < (max_context-alert_context_size_gap) && main_api === 'kobold') || (count_tokens < (2048-alert_context_size_gap) && main_api === 'novel') || (count_tokens < (max_context_openai-alert_context_size_gap) && main_api === 'openai')){
-                        $('#result_info').html(count_tokens+" Tokens");
-                    }else{
-                        $('#result_info').html("<font color=red>"+count_tokens+" Tokens(TOO MANY TOKENS)</font>");
-                    }
-
-                    //$('#result_info').transition({ opacity: 0.0 ,delay: 500,duration: 1000,easing: 'in-out',complete: function() { 
-                            //$('#result_info').transition({ opacity: 1.0,duration: 0}); 
-                            //$('#result_info').html('&nbsp;');
-                    //}});
-                },
-                error: function (jqXHR, exception) {
-                    $('#create_button').removeAttr("disabled");
-                    //$('#result_info').html("<font color=red>Error: no connection</font>");
-                    callPopup(exception, 'alert_error');
-                }
-            }); 
-        }
-
-    });
-
-    $( "#delete_button" ).click(function() {
-        callPopup('<h3>Delete the character?</h3>', 'del_ch');
-    });
     $( "#rm_info_button" ).click(function() {
         $('#rm_info_avatar').html('');
         select_rm_characters();
     });
     //@@@@@@@@@@@@@@@@@@@@@@@@
     //character text poles creating and editing save
-    $('#character_name_pole').on('change keyup paste', function(){
-        if(menu_type == 'create'){
-            create_save_name = $('#character_name_pole').val();
-        }
-
-    });
-    $('#description_textarea').on('keyup paste cut', function(){
-        if(menu_type === 'create'){
-            create_save_description = $('#description_textarea').val();
-        }else{
-            editorDescriptionWPP.text = $('#description_textarea').val();
-            if(timerSaveEdit) { clearTimeout(timerSaveEdit) };
-            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-        }
-    });
-    $('#notes_textarea').on('keyup paste cut', function(){
-        
-    });
-    $('#personality_textarea').on('keyup paste cut', function(){
-        if(menu_type == 'create'){
-
-            create_save_personality = $('#personality_textarea').val();
-        }else{
-            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-        }
-    });
-    $('#scenario_pole').on('keyup paste cut', function(){
-        if(menu_type == 'create'){
-
-            create_save_scenario = $('#scenario_pole').val();
-        }else{
-            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-        }
-    });
-    $('#mes_example_textarea').on('keyup paste cut', function(){
-        if(menu_type == 'create'){
-
-            create_save_mes_example = $('#mes_example_textarea').val();
-        }else{
-            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-        }
-    });
-    $('#firstmessage_textarea').on('keyup paste cut', function(){
-
-        if(menu_type == 'create'){
-            create_save_first_message = $('#firstmessage_textarea').val();
-        }else{
-            timerSaveEdit = setTimeout(() => {$("#create_button").click();},durationSaveEdit);
-        }
-    });
     $( "#api_button" ).click(function() {
         if($('#api_url_text').val() != ''){
             $("#api_loading").css("display", 'inline-block');
@@ -3376,36 +3171,6 @@ $(document).ready(function(){
         saveSettings();
     });
 
-    document.getElementById("description_wppeditor").style.display = "none";
-    document.getElementById("description_wpp_checkbox").checked = false;
-    $('#description_wpp_checkbox').change(function() {
-        if($('#description_wpp_checkbox').prop('checked')) {
-            document.getElementById("description_wppeditor").style.display = null;
-            document.getElementById("description_textarea").style.display = "none";
-            $('#description_wppeditor').css('opacity', 0.0);
-            $('#description_wppeditor').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
-            
-        } else {
-            document.getElementById("description_textarea").style.display = null;
-            document.getElementById("description_wppeditor").style.display = "none";
-            $('#description_textarea').css('opacity', 0.0);
-            $('#description_textarea').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
-        }
-    });
-    $('#notes_wpp_checkbox').change(function() {
-        if($('#notes_wpp_checkbox').prop('checked')) {
-            document.getElementById("notes_wpp_editor").style.display = null;
-            document.getElementById("notes_textarea").style.display = "none";
-            $('#notes_wpp_editor').css('opacity', 0.0);
-            $('#notes_wpp_editor').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
-            
-        } else {
-            document.getElementById("notes_textarea").style.display = null;
-            document.getElementById("notes_wpp_editor").style.display = "none";
-            $('#notes_textarea').css('opacity', 0.0);
-            $('#notes_textarea').transition({ opacity: 1.0 ,duration: 410, easing:animation_rm_easing});
-        }
-    });
 
     //Novel
     $(document).on('input', '#temp_novel', function() {
@@ -4011,6 +3776,9 @@ $(document).ready(function(){
                         }
 
                     }
+                    character_sorting_type = settings.character_sorting_type;
+                    $('#rm_folder_order option[value="'+character_sorting_type+'"]').attr('selected', 'true');
+
                     if(settings.characloud){
                         showCharaCloud();
                     }
@@ -4045,7 +3813,7 @@ $(document).ready(function(){
 
     }
 
-    async function saveSettings(type){
+    async function saveSettings(){
 
         jQuery.ajax({    
             type: 'POST', 
@@ -4107,7 +3875,8 @@ $(document).ready(function(){
                     pres_pen_openai: pres_pen_openai,
                     max_context_openai: max_context_openai,
                     amount_gen_openai: amount_gen_openai,
-                    model_openai: model_openai
+                    model_openai: model_openai,
+                    character_sorting_type: character_sorting_type
                     }),
             beforeSend: function(){
 
@@ -4120,9 +3889,7 @@ $(document).ready(function(){
             //processData: false, 
             success: function(data){
                 //online_status = data.result;
-                if(type === 'change_name'){
-                    location.reload();
-                }
+
 
             },
             error: function (jqXHR, exception) {
@@ -4660,9 +4427,13 @@ $(document).ready(function(){
         if(!is_send_press){
             name1 = $("#your_name").val();
             if(name1 === undefined || name1 == '') name1 = default_user_name;
-            console.log(name1);
-            saveSettings('change_name');
-
+            $('.mes').each(function () {
+                if ($(this).attr('is_user') === 'true') {
+                    $(this).find('.ch_name').text(name1);
+                }
+            });
+            saveSettings();
+            
         }
     });
     $("#your_avatar_add_button").click(function() {
@@ -4734,7 +4505,12 @@ $(document).ready(function(){
                     if(mes.length > strlen){
                         mes = '...'+mes.substring(mes.length - strlen);
                     }
-                    $('#select_chat_div').append('<div class="select_chat_block" file_name="'+data[key]['file_name']+'"><div class=avatar><img src="characters/'+Characters.id[Characters.selectedID].filename+'"></div><div class="select_chat_block_filename">'+data[key]['file_name']+'</div><div class="select_chat_block_mes">'+vl(mes)+'</div></div>');
+                    let delete_chat_div = `<div class="chat_delete"><a href="#">Delete</a></div>`;
+                    if(Number(Characters.id[Characters.selectedID].chat) === Number(data[key]['file_name'].split(".")[0])){
+                        delete_chat_div = '';
+                    }
+
+                    $('#select_chat_div').append('<div class="select_chat_block" file_name="'+data[key]['file_name']+'"><div class=avatar><img src="characters/'+Characters.id[Characters.selectedID].filename+'"></div><div class="select_chat_block_filename">'+data[key]['file_name']+'</div><div class="select_chat_block_mes">'+vl(mes)+'</div><div class="chat_export"><a href="#">Export</a></div>'+delete_chat_div+'</div>');
                     if(Characters.id[Characters.selectedID]['chat'] == data[key]['file_name'].replace('.jsonl', '')){
                         //children().last()
                         $('#select_chat_div').children(':nth-last-child(1)').attr('highlight', true);
@@ -4757,6 +4533,34 @@ $(document).ready(function(){
             }
         });
     }
+    $('#select_chat_popup').on('click', '.chat_export', function(e){
+        e.stopPropagation();
+        let chat_file = $(this).parent().attr('file_name');
+        console.log();
+        $.get(`../chats/${Characters.id[Characters.selectedID].filename.replace(`.${characterFormat}`, '')}/${chat_file}`, function (data) {
+            let blob = new Blob([data], {type: "application/json"});
+            let url = URL.createObjectURL(blob);
+            let $a = $("<a>").attr("href", url).attr("download", `${Characters.id[Characters.selectedID].name}_${chat_file}`);
+            $("body").append($a);
+            $a[0].click();
+            $a.remove();
+        });
+    });
+    $('#select_chat_popup').on('click', '.chat_delete', function(e){
+        e.stopPropagation();
+        let $patent = $(this).parent()
+        let chat_file = $(this).parent().attr('file_name');
+        data_delete_chat = {
+            chat_file:chat_file,
+            character_filename: Characters.id[Characters.selectedID].filename.replace(`.${characterFormat}`, '')
+        
+        };
+        callPopup('<h3>Delete this chat?</h3>', 'delete_chat');
+
+        
+    });
+    
+
     //************************************************************
     //************************Novel.AI****************************
     //************************************************************
@@ -4843,6 +4647,7 @@ $(document).ready(function(){
         openAIChangeMaxContextForModels();
         saveSettings();
     });
+    
     function openAIChangeMaxContextForModels(){
         let this_openai_max_context;
         switch(model_openai){
@@ -4980,82 +4785,6 @@ $(document).ready(function(){
     }
 
 
-
-    //**************************CHARACTER IMPORT EXPORT*************************//
-    $( "#rm_button_import" ).click(function() {
-        $("#character_import_file").click();
-    });
-    $("#character_import_file").on("change", function(e){
-        $('#rm_info_avatar').html('');
-        var file = e.target.files[0];
-        //console.log(1);
-        if (!file) {
-          return;
-        }
-        var ext = file.name.match(/\.(\w+)$/);
-        if(!ext || (ext[1].toLowerCase() != "json" && ext[1].toLowerCase() != "png" && ext[1].toLowerCase() != "webp")){
-            return;
-        }
-
-        var format = ext[1].toLowerCase();
-        $("#character_import_file_type").val(format);
-        //console.log(format);
-        var formData = new FormData($("#form_import").get(0));
-
-        jQuery.ajax({    
-            type: 'POST', 
-            url: '/importcharacter', 
-            data: formData,
-            beforeSend: function(){
-                //$('#create_button').attr('disabled',true);
-                //$('#create_button').attr('value','Creating...'); 
-            },
-            cache: false,
-            timeout: requestTimeout,
-            contentType: false,
-            processData: false, 
-            success: function(data){
-                if(data.file_name !== undefined){
-
-                    characterAddedSign(data.file_name, 'Character imported');
-
-                }
-            },
-            error: function (jqXHR, exception) {
-                $('#create_button').removeAttr("disabled");
-            }
-        });  
-    });
-    $('#export_button').click(function(){
-        var link = document.createElement('a');
-        link.href = 'characters/'+Characters.id[Characters.selectedID].filename;  
-        link.download = Characters.id[Characters.selectedID].filename;
-        document.body.appendChild(link);
-        link.click();
-   });
-
-    async function characterAddedSign(file_name, alert_text = 'Character created'){
-        $('#rm_info_block').transition({opacity: 0, duration: 0});
-        var $prev_img = $('#avatar_div_container').clone();
-        $prev_img.children('img').attr('src', 'characters/'+file_name+'.'+characterFormat);
-        $('#rm_info_avatar').append($prev_img);
-        select_rm_info("Character created");
-
-        $('#rm_info_block').transition({opacity: 1.0, duration: 2000});
-        await Characters.loadAll()
-                .then(function(){
-                    
-                })
-                .catch(function (error) {
-                    switch (error.status) {
-                        default:
-                            callPopup(`${error.msg}`, 'alert_error');
-                            return;
-                    }
-                });
-    }
-
-
 //**************************CHAT IMPORT EXPORT*************************//
     $( "#chat_import_button" ).click(function() {
         $("#chat_import_file").click();
@@ -5073,10 +4802,8 @@ $(document).ready(function(){
 
         var format = ext[1].toLowerCase();
         $("#chat_import_file_type").val(format);
-        //console.log(format);
-        console.warn($("#form_import_chat").get(0));
         var formData = new FormData($("#form_import_chat").get(0));
-
+        formData.append('filename', Characters.id[Characters.selectedID].filename);
         jQuery.ajax({    
             type: 'POST', 
             url: '/importchat', 
@@ -5293,7 +5020,26 @@ $(document).ready(function(){
 
     }
     function printCharactersBoard(characloud_characters_board) {
-        
+        charaCloud.getCategories() // autocomplete
+            .then(function (data) {
+                const top_categories = data.sort((a, b) => b.count - a.count).slice(0, 10);
+                $('#header_categories').append(`<div class="category header-category" data-category="$categories">Categories</div>`);
+                $('#header_categories').append(`<div class="category header-category" data-category="$recent">Recent</div>`);
+                $('#header_categories').append(`<div class="category header-category" data-category="$random">Random</div>`);
+                top_categories.forEach(function (item, i) {
+                    $('#header_categories').append(`<div class="category header-category" data-category="${item.name}">${item.name} (${item.count})</div>`);
+                });
+
+            })
+            .catch(function (error) {
+                console.log(error);
+                switch (error.status) {
+                    
+                    default:
+                        callPopup(`${error.msg}`, 'alert_error');
+                        return;
+                }
+            });
         let char_i = 0;
         let row_i = 0;
         $('#characloud_characters').html('');
@@ -5415,32 +5161,32 @@ $(document).ready(function(){
         });
         if(need_to_load){
             await charaCloud.loadCard(user_name, public_id_short)
-                    .then(async function (data) {
-                        Characters.loadAll().then(async function () {
-                            let filename = data.filename;
-                            let id = Characters.getIDbyFilename(filename);
-                            $(`#rm_print_charaters_block .character_select[chid="${id}"]`).click();
-                        }).catch(function (error) {
-                            switch (error.status) {
-                                default:
-                                    callPopup(`${error.msg}`, 'alert_error');
-                                    return;
-                            }
-                        });
-                    })
-                    .catch(function (error) {
+                    .then(data => {
+                        let id = Characters.getIDbyFilename(data.filename);
+                        if(id < 0) {
+                            Characters.addCharacter(data);
+                            Characters.onCharacterSelect({
+                                target: data.filename
+                            });
+                        } else {
+                            Characters.onCharacterSelect({
+                                target: data.filename
+                            });
+                        }
+                    }, error => {
+                        console.error(error.status);
                         switch (error.status) {
                             default:
                                 callPopup(`${error.msg}`, 'alert_error');
                                 return;
                         }
                     });
-            
-            
             $('#shell').css('display', 'grid');
             $('#chara_cloud').css('display', 'none');
         }else{
-            $(`#rm_print_charaters_block .character_select[chid="${selected_char_id}"]`).click();
+            Characters.onCharacterSelect({
+                target: Characters.id[selected_char_id].filename
+            });
             $('#shell').css('display', 'grid');
             $('#chara_cloud').css('display', 'none');
         }
@@ -5888,7 +5634,6 @@ $(document).ready(function(){
         formData.append('filename_local', Characters.id[Characters.selectedID].filename);
         showCharaCloud();
         prepublishCard(formData);
-        
     });
     function prepublishCard(formData){
         jQuery.ajax({    
@@ -5994,13 +5739,17 @@ $(document).ready(function(){
             charaCloud.cardeditor_data.user_name = login;
             charaCloud.cardeditor_data.user_name_view = login_view;
             charaCloud.cardeditor_data.online = true;
+            charaCloud.cardeditor_data.add_date_local = Date.now();
+            charaCloud.cardeditor_data.last_action_date = Date.now();
         }
-
+        
         charaCloud.publishCharacter('add_locally')
             .then(async function (data) {
                 if(type === 'default'){
                     callPopup(`Character added`, 'alert');
                 }
+                
+                var a = await Characters.loadAll();             
                 await characterAddedSign(data.file_name, 'Character added');
                 charaCloud.cardeditor_id_local = Characters.getIDbyFilename(`${data.file_name}.${characterFormat}`);
                 charaCloud.cardeditor_filename_local = Characters.id[charaCloud.cardeditor_id_local].filename;
@@ -6028,6 +5777,7 @@ $(document).ready(function(){
             charaCloud.cardeditor_data.user_name = login;
             charaCloud.cardeditor_data.user_name_view = login_view;
             charaCloud.cardeditor_data.online = true;
+            charaCloud.cardeditor_data.last_action_date = Date.now();
         }
 
         let char_id = Characters.getIDbyFilename(charaCloud.cardeditor_filename_local);
@@ -6039,7 +5789,10 @@ $(document).ready(function(){
                 }
                 await Characters.loadAll();
                 char_id = Characters.getIDbyFilename(charaCloud.cardeditor_filename_local);
-                $(`#rm_print_charaters_block .character_select[chid="${char_id}"]`).click();
+                Characters.onCharacterSelect({
+                    target: charaCloud.cardeditor_filename_local
+                });
+
 
             })
             .catch(function (error) {
@@ -6309,7 +6062,7 @@ $(document).ready(function(){
         }
         $('#editor_nsfw').prop('checked', character_data.nsfw);
 
-        // Categories
+        // Character edit Categories 
         if (character_data.categories !== undefined) {
 
             let categories = character_data.categories;
@@ -6317,8 +6070,26 @@ $(document).ready(function(){
                 addCategory(item);
             });
         }
+        charaCloud.getCategories() // autocomplete
+            .then(function (data) {
+                $('.popular-categories-list').html('');
+                $('.popular-categories-title').text('Popular categories');
+                const top_categories = data.sort((a, b) => b.count - a.count).slice(0, 10);
+                top_categories.forEach(function (item, i) {
+                    $('.popular-categories-list').append(`<div class="category popular-category">+ ${item.name} (${item.count})</div>`);
+                });
 
-        
+            })
+            .catch(function (error) {
+                console.log(error);
+                switch (error.status) {
+                    
+                    default:
+                        callPopup(`${error.msg}`, 'alert_error');
+                        return;
+                }
+            });
+            
         // Online checking
         let character_data_online;
         let online_type_action = 'publish';
@@ -6540,6 +6311,15 @@ $(document).ready(function(){
     
     ///////////////////////////
     //********* Categories ********//
+    $('#header_categories').on('click', '.header-category', function () {
+        let this_category = $(this).data('category');
+        if(this_category === '$categories'){
+            showCategories();
+            return;
+        }else{
+            showCategory($(this).data('category'));
+        }
+    });
     var is_character_page_categories_show = false;
     $('#category-input-field').on('focus', function () {
         if (!is_character_page_categories_show) {
@@ -6592,10 +6372,9 @@ $(document).ready(function(){
         $(this).remove();
     });
     
-    $('.popular-category').on('click', function () {
-        let category = $(this).text().substr(2);
+    $('.category-form').on('click', '.popular-category', function (e) {
+        let category = $.trim($(this).text().substr(2).replace(/ *\([^)]*\) */g, ""));
         addCategory(category);
-        //$('.category-list').prepend('<div class="category character-category">' + category + '<span class="category-remove">x</span></div>');
     });
     $('#chara_cloud').on('click', '.characloud_characters_category_title', function () {
         let category = $(this).attr('category');
@@ -6607,7 +6386,11 @@ $(document).ready(function(){
             .then(function (data) {
                 let count_char_in_row = 10; 
                 let characters_board = [];
+                if(category === '$random' || category === '$recent'){
+                    category = category.substring(0, 2).toUpperCase() + category.substring(2); 
+                }
                 let category_show = category.replace('$', '');
+                
                 let end = 0;
                 if (false) {
                     for (let i = 0; end < data.length; i++) {
@@ -6668,25 +6451,22 @@ $(document).ready(function(){
                 let categories = [{name: '$recent', name_view: '$Recent'},{name: '$random', name_view: '$Random'}];
 
                 categories = categories.concat(data);
-
+                let categories_sort = categories;
+                categories = categories_sort.sort((a, b) => b.count - a.count);
                 // loop through the categories array and create a category element for each one
                 for (let i = 0; i < categories.length; i++) {
-                    console.log(categories[i]);
+                    let name_view = categories[i].name_view;
+                    if (categories[i].name !== '$recent' && categories[i].name !== '$random') {
+                        name_view = `${name_view} (${categories[i].count})`;
+                    }
                     const $category = $('<div>', {
-                        class: 'category show-category',
-                        text: categories[i].name_view,
-                        // add a data attribute to store the category name
-                        'data-category': categories[i].name
-                    });
+                            class: 'category show-category',
+                            text: name_view,
+                            'data-category': categories[i].name
+                        });
                     $categoriesList.append($category);
                 }
 
-                // add a click event listener to the categories
-                $categoriesList.on('click', '.category', function () {
-                    const category = $(this).data('category');
-                    // do something with the selected category, e.g. navigate to a page that shows only that category's content
-                    console.log('Selected category:', category);
-                });
             })
             .catch(function (error) {
                 console.log(error);
@@ -6698,8 +6478,8 @@ $(document).ready(function(){
                 }
             });
     }
-    $(document).on('click', '.show-category', function (e) {
-        let category = $(this).text();
+    $('#characloud_categories').on('click', '.show-category', function (e) {
+        let category = $(this).attr('data-category');
         showCategory(category);
     });
 
@@ -6727,16 +6507,6 @@ function handleError(jqXHR) { // Need to make one handleError and in script.js a
     console.log(`Status: ${status}`);
     console.log(msg);
     return {'status': status, 'msg': msg};
-}
-document.getElementsByName("rm_search_bar")[0].addEventListener('keyup', search_chars);
-function search_chars(){
-    const character_list = document.querySelector('#rm_print_charaters_block').querySelectorAll('div.character_select');
-    for (let i = 0; i < character_list.length; i++) {
-        character_list[i].style.display = "";
-        if (character_list[i].textContent.toLowerCase().indexOf(this.value.toLowerCase())<0){
-            character_list[i].style.display = "none";
-        }
-    }
 }
 /*
 function auto_start(){

@@ -1,6 +1,7 @@
 /**
  * Resizeable and draggable window with optional close button
  */
+import {animation_rm_duration, animation_rm_easing} from "../script.js";
 export class Resizable {
     static focused;
 
@@ -210,46 +211,89 @@ export class Resizable {
         }
     }
 
-    /** Hides window */
-    show() {
-        if(!this.container) { return; }
-        if(this.shown) { return; }
-        this.shown = true;
-        this.root.classList.add("shown");
-    }
-
     /** Shows window */
-    hide() {
-        if(!this.container) { return; }
-        this.shown = false;
-        this.root.classList.remove("shown");
-        this.unfocus();
+    show() {
+        let this_shadow_container = `#${this.root.id}`;
+        if (!this.container) {
+            return;
+        }
+        if (this.shown) {
+            return;
+        }
+        $(this_shadow_container).css('opacity', 0.0);
+        $(this_shadow_container).css('display', 'block');
+        $(this_shadow_container).transition({opacity: 1.0, duration: animation_rm_duration, easing: animation_rm_easing, complete: function () {
+
+        }});
+        this.shown = true;
     }
 
-    findChildWithClass(className, parent) {
+    
+    /** Hides window */
+    hide() {
+        let this_shadow_container = `#${this.root.id}`;
+        if (!this.container) {
+            return;
+        }
+        $(this_shadow_container).transition({opacity: 0.0, duration: animation_rm_duration, easing: animation_rm_easing, complete: function () {
+            $(this_shadow_container).css('display', 'none');
+        }});
+        this.shown = false;
+        this.unfocus();
+        
+        
+    }
+
+    findChildWithClass(className, parent, recursive) {
         if(!className || !className.length) { return null; }
         if(parent) {
+            let classes = [];
+            parent.classList.forEach(c => classes.push(c));
+            let res = null;
             for(let i = 0; i < parent.children.length; i++) {
                 if(parent.children[i].classList.contains(className)) {
-                    return parent.children[i];
+                    res = parent.children[i];
+                    break;
+                }
+                if(recursive) {
+                    res = this.findChildWithClass(className, parent.children[i], recursive);
+                    if(res) {
+                        break;
+                    }
                 }
             }
-            return null;
+            return res;
         }
-        return this.findChildWithClass(className, this.header) || this.findChildWithClass(className, this.content) || this.findChildWithClass(className, this.footer);
+        return (
+            (this.header ? this.findChildWithClass(className, this.header) : null) ||
+            (this.content ? this.findChildWithClass(className, this.content) : null) ||
+            (this.footer ? this.findChildWithClass(className, this.footer) : null)
+        );
     }
 
-    findChildWithType(nodeName, parent) {
+    findChildWithType(nodeName, parent, recursive) {
         if(!nodeName || !nodeName.length) { return null; }
         if(parent) {
+            let res = null;
             for(let i = 0; i < parent.children.length; i++) {
                 if(parent.children[i].nodeName.toLowerCase() === nodeName.toLowerCase()) {
-                    return parent.children[i];
+                    res = parent.children[i];
+                    break;
+                }
+                if(recursive) {
+                    res = this.findChildWithType(nodeName, parent.children[i], recursive);
+                    if(res) {
+                        break;
+                    }
                 }
             }
-            return null;
+            return res;
         }
-        return this.findChildWithType(nodeName, this.header) || this.findChildWithType(nodeName, this.content) || this.findChildWithType(nodeName, this.footer);
+        return (
+            (this.header ? this.findChildWithType(nodeName, this.header) : null) ||
+            (this.content ? this.findChildWithType(nodeName, this.content) : null) ||
+            (this.footer ? this.findChildWithType(nodeName, this.footer) : null)
+        );
     }
 
     /* Destructor */
