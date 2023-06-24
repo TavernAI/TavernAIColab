@@ -177,7 +177,9 @@ pre {
 }
 #shell {
     display: grid;
-    grid-template-rows: 40px auto 145px;
+    /*grid-template-rows: 40px auto 145px;*/
+    grid-template-rows: 40px [chat] auto [inputform] minmax(145px, min-content);
+    
     background: #191b3133;
     height: 100vh;
     overflow: auto;
@@ -186,8 +188,10 @@ pre {
     max-width:800px;
     margin-left: auto;
     margin-right: auto;
+    
 }
 #chat_header {
+    position: relative;
     background: #191b31;
     height: 100%;
     border-radius: 3px;
@@ -257,9 +261,10 @@ pre {
     margin-right: auto;
 }
 #send_textarea{
-    --autoresize: false;
+    --autoresize: true;
     /* width:100%;  */
     height: 89px;
+    max-height: 50vh;
     resize: none;
     display:inline-block;
     background-color: #13152c;
@@ -610,6 +615,14 @@ textarea {
     padding: 0px;
     margin-bottom: 5px;
 }
+
+#proxy_set_context_size_button {
+    cursor: pointer;
+    display: inline-block;
+    font-weight: 600;
+    opacity: 0.8;
+}
+
 .modular .h5_menu_help {
     margin-bottom: 0px;
 }
@@ -1204,7 +1217,7 @@ input[type=submit], input[type=button] {
     border-radius: 1ex;
     margin-top: 1ex;
     flex-grow: 3;
-    min-width: calc(100% - 5.5em);
+    min-width: calc(100%);
 }
 .world_info_details .comment.empty {
     opacity: 0.5;
@@ -1370,7 +1383,24 @@ chareditor-button-close {
 }
 .create .chareditor-button-online {
     display: none;
+    
 }
+#characters_rooms_switch_button {
+    width: 97%; 
+    margin-left: 3px;
+    font-weight: bold;
+    color: #ffffff99;
+    padding: 0.5em;
+    border: thin solid rgba(200,200,200,0.2);
+    border-radius: 3px;
+    background-color: #191b31;
+    cursor: pointer;
+}
+
+#characters_rooms_switch_button_rooms_text {
+    opacity: 0.5;
+}
+
 .chareditor .chareditor-token-warning-count,
 .chareditor .chareditor-token-warning-left {
     display: none;
@@ -1704,7 +1734,7 @@ select {
 #openai_api_logo {
     position: absolute; 
     right:164px; 
-    top:-27px; 
+    top:-33px; 
     opacity:0.25;
 }
 #openai_api_logo img {
@@ -1908,8 +1938,8 @@ input[type="range"]::-ms-thumb {
     outline: none;
     transition: 0.3s;
     display: inline-block;
-    
-    
+
+
 }
 .toggle_lock[type="checkbox"]:before {
     content: "";
@@ -2166,19 +2196,34 @@ label.checkbox :checked + span:after {
     margin-top: 4px;
 }
 
-#openai_system_prompt_textarea, #openai_jailbreak_prompt_textarea, #openai_jailbreak2_prompt_textarea {
+#system_prompt_textarea, #jailbreak_prompt_textarea, #user_jailbreak_prompt_textarea {
     margin-left: 2px;
     width: 94%;
     height: 180px;
     margin-top: 4px;
     margin-bottom: 16px;
 }
-#openai_jailbreak_prompt_textarea {
+#jailbreak_prompt_textarea {
     height: 100px;
 }
-#openai_jailbreak2_prompt_textarea {
+#user_jailbreak_prompt_textarea {
     height: 60px;
     margin-bottom: 28px;
+}
+
+#default_openai_url_button {
+    position: absolute;
+    display: inline-block;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    opacity: 0.35;
+    margin-top: 5px;
+    margin-left: 7px;
+}
+
+#api_url_openai:disabled {
+    color: #ffffff66;
 }
 #character_popup_ok {
     cursor: pointer;
@@ -2500,7 +2545,7 @@ label.wpp_label {
 .world_info .row {
     width: 100%;
     display: flex;
-    height: 1.9em;
+    height: 42px;
     border-radius: 0.5ex;
     margin-bottom: 0.5ex;
 }
@@ -2817,12 +2862,20 @@ li.folder:not(.opened) > .children > li.folder:not(.opened) > div {
     margin: 0px; 
 }
 .character-screen {
-    min-height: 72vh;
+    min-height: 62vh;
 }
 .character-screen .folder-content, .character-screen .folder {
     padding: 0px;
+}
+
+.folder-content {
     cursor: pointer;
 }
+
+#room_character_select_items .avatar img, #room_character_selected_items .avatar img {
+    cursor: pointer;
+}
+
 .character-screen .folder-content > div, .character-screen .folder > div {
     border-radius: 1ex;
 }
@@ -3105,4 +3158,35 @@ li.folder:not(.opened) > .children > li.folder:not(.opened) > div {
         width: 100%;
         height: 100%;
     }
+}
+
+/* Story */
+#story {
+    display: none;
+}
+
+#chat_story_button {
+
+    cursor: pointer;
+    position: absolute;
+    right: 20px;
+    font-weight: 700;
+    font-size: 11pt;
+    opacity: 0.72;
+}
+#chat_story_button_story_text {
+    opacity: 0.5;
+}
+
+
+#story_textarea {
+    height: 99%;
+    scrollbar-width: thin;
+    padding-left: 18px;
+    font-size: 13.5pt;
+    background: #191b31A0;
+}
+
+#story_textarea .highlight {
+  background-color: yellow;
 }

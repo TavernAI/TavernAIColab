@@ -92,12 +92,14 @@ var response_getstatus_openai;
 var response_getlastversion;
 var api_key_novel;
 var api_key_openai;
+var api_url_openai;
 
 var is_colab = true;
 var charactersPath = 'public/characters/';
 var worldPath = 'public/worlds/';
 var chatsPath = 'public/chats/';
 var UserAvatarsPath = 'public/User Avatars/';
+var roomsPath = 'public/rooms/';
 if (is_colab && process.env.googledrive == 2){
     charactersPath = '/content/drive/MyDrive/TavernAI/characters/';
     chatsPath = '/content/drive/MyDrive/TavernAI/chats/';
@@ -353,16 +355,20 @@ app.post("/generate", jsonParser, function(request, response_generate = response
         }
         if(response.statusCode == 422){
             console.log('Validation error');
-            response_generate.send({error: true});
+            response_generate.send({error: true, error_message: "Validation error"});
         }
         if(response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507){
             console.log(data);
-            response_generate.send({error: true});
+            if(data.detail && data.detail.msg) {
+                response_generate.send({error: true, error_message: data.detail.msg});
+            } else {
+                response_generate.send({error: true, error_message: "Error. Status code: " + response.statusCode});
+            }
         }
     }).on('error', function (err) {
         console.log(err);
 	//console.log('something went wrong on the request', err.request.options);
-        response_generate.send({error: true});
+        response_generate.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
 app.post("/savechat", jsonParser, function(request, response){
@@ -445,6 +451,88 @@ app.post("/getchat", jsonParser, function(request, response){
     });
 
     
+
+    
+});
+app.post("/savechatroom", jsonParser, function(request, response){
+    //console.log(request.data);
+    //console.log(request.body.bg);
+     //const data = request.body;
+    //console.log(request);
+    //console.log(request.body.chat);
+    //var bg = "body {background-image: linear-gradient(rgba(19,21,44,0.75), rgba(19,21,44,0.75)), url(../backgrounds/"+request.body.bg+");}";
+    var dir_name = String(request.body.filename);
+    let chat_data = request.body.chat;
+    let jsonlData = chat_data.map(JSON.stringify).join('\n');
+    fs.writeFile(roomsPath+"/"+request.body.filename+'.jsonl', jsonlData, 'utf8', function(err) {
+        if(err) {
+            response.send(err);
+            return console.log(err);
+            //response.send(err);
+        }else{
+            //response.redirect("/");
+            response.send({result: "ok"});
+        }
+    });
+    
+});
+app.post("/getchatroom", jsonParser, function(request, response){
+    
+    // Expected: request.body.room_filename is the .jsonl file name (WITHOUT the extension) representing the room referred
+
+    var dir_name = String(request.body.room_filename);
+
+    fs.stat(roomsPath+dir_name+".jsonl", function(err, stat) {
+            
+        if(stat === undefined){
+
+            fs.mkdirSync(roomsPath+dir_name+".jsonl");
+            response.send({});
+            return;
+        }else{
+            
+            if(err === null){
+                
+                fs.stat(roomsPath+request.body.room_filename+".jsonl", function(err, stat) {
+                    
+                    if (err === null) {
+                        
+                        if(stat !== undefined){
+                            fs.readFile(roomsPath+request.body.room_filename+".jsonl", 'utf8', (err, data) => {
+                                if (err) {
+                                  console.error(err);
+                                  response.send(err);
+                                  return;
+                                }
+                                //console.log(data);
+                                const lines = data.split('\n');
+
+                                // Iterate through the array of strings and parse each line as JSON
+                                const jsonData = lines.map(json5.parse);
+                                response.send(jsonData);
+
+
+                            });
+                        }
+                    }else{
+                        response.send({});
+                        //return console.log(err);
+                        return;
+                    }
+                });
+            }else{
+                console.error(err);
+                response.send({});
+                return;
+            }
+        }
+        
+
+    });
+
+    
+
+    
 });
 app.post("/getstatus", jsonParser, function(request, response_getstatus = response){
     if(!request.body) return response_getstatus.sendStatus(400);
@@ -498,7 +586,7 @@ function checkServer(){
 //***************** Main functions
 function checkCharaProp(prop) {
   return (String(prop) || '')
-      .replace(/[\u2018\u2019‘’]/g, "'")
+      .replace(/[\u2018\u2019�?’]/g, "'")
       .replace(/[\u201C\u201D“”]/g, '"');
 }
 function charaFormatData(data){
@@ -594,6 +682,7 @@ function charaFormatData(data){
 }
 app.post("/createcharacter", urlencodedParser, async function(request, response){
     let target_img = setCardName(request.body.ch_name);
+
     
     if(!request.body) return response.sendStatus(400);
     if (!fs.existsSync(charactersPath+target_img+`.${characterFormat}`)){
@@ -634,7 +723,36 @@ app.post("/createcharacter", urlencodedParser, async function(request, response)
     //response.redirect("https://metanit.com")
 });
 
+app.post("/createroom", urlencodedParser, async function(request, response){
+    // let target_img = setCardName(request.body.ch_name);
 
+    // since we are planning to re-use existing code, ch_name == filename (jsonl filename), since changing vvariables means we need
+    // to also change the html file's form's input "name" attributes
+    let target_file = request.body.ch_name; 
+    let characterNames = request.body.room_characters;
+    let scenario = request.body.room_scenario;
+    const fileExtension = ".jsonl";
+    
+    if(!request.body) return response.sendStatus(400);
+    if(!request.body.room_characters) return response.sendStatus(400); // A room needs to have at least one character
+    if (!fs.existsSync(roomsPath+target_file+fileExtension)){
+
+        if(!scenario)
+            await roomWrite(target_file, characterNames);
+        else
+            await roomWrite(target_file, characterNames, "You", Date.now(), "", "discr", scenario, []);
+
+        response.status(200).send({file_name: target_file});
+        //console.log("The file was saved.");
+
+    }else{
+        response.send("Error: A room with that name already exists.");
+    }
+    //console.log(request.body);
+    //response.send(target_img);
+
+    //response.redirect("https://metanit.com")
+});
 
 app.post("/editcharacter", urlencodedParser, async function(request, response){
     try {
@@ -699,6 +817,59 @@ app.post("/deletecharacter", jsonParser, function(request, response){
         return response.status(400).json({error: err.toString()});
     }
 });
+
+app.post("/editroom", urlencodedParser, async function(request, response){
+    try {
+        if (!request.body)
+            return response.sendStatus(400);
+
+        let filename = request.body.filename;
+        
+        // let filedata = request.file; // No file data for rooms, since rooms do not have any avatar/image associated with them
+        var fileExtension = ".jsonl";
+        var img_file = "ai";
+        var img_path = roomsPath;
+        
+        let old_room_data = await roomRead(filename + fileExtension);
+        let old_room_metadata = old_room_data[0];
+        let room_data_array = Object.values(old_room_data); // Convert JSON object (of JSON objects) into an array (of JSON objects)
+        room_data_array.shift(); // The first line is metadata, so need to remove it first
+        let room_chat_data = room_data_array;
+        // let old_char_data = JSON.parse(old_char_data_json); // No need for this line, since roomRead() already returns a JSON object (not as string)
+        let new_room_metadata = request.body;
+        
+        let merged_room_metadata = Object.assign({}, old_room_metadata, new_room_metadata);
+
+        
+        await roomWrite(filename, merged_room_metadata.character_names, merged_room_metadata.user_name, merged_room_metadata.create_date,
+            merged_room_metadata.notes, merged_room_metadata.notes_types, merged_room_metadata.scenario, room_chat_data);
+
+        return response.status(200).send('Room saved');
+    } catch (err) {
+        console.log(err);
+        return response.status(400).json({error: err.toString()});
+    }
+});
+
+// Expected filename without the extension
+app.post("/deleteroom", jsonParser, function(request, response){
+    try {
+        if (!request.body){
+            return response.sendStatus(400).json({error: 'Validation body error'});
+        }
+        let extension = ".jsonl";
+        let filename = request.body.filename + extension;
+        rimraf.sync(roomsPath + filename);
+        // let dir_name = filename;
+        // rimraf.sync(chatsPath + dir_name.replace(`.${characterFormat}`, ''));
+        return response.status(200).json({});
+    } catch (err) {
+        console.log(err);
+        return response.status(400).json({error: err.toString()});
+    }
+});
+
+
 
 async function charaWrite(source_img, data, target_img, format = 'webp') {
     try {
@@ -802,6 +973,31 @@ async function charaRead(img_url, input_format){
 
 }
 
+// The function already appends the roomsPath before filedir (filename), and the .jsonl extension after the filedir
+async function roomWrite(filedir, characterNames, user_name="You", create_date="", notes="", notes_type="discr", scenario="", chat=[]) {
+    try {
+        const fileExtension = ".jsonl"; 
+        let fileContent = ''; // In string form
+        let createDate = create_date ? create_date : Date.now();
+        // let characterNamesArray = characterNames.isArray() ? characterNames : [characterNames];
+        if(!Array.isArray((characterNames)))
+            characterNames = [characterNames]; // Convert character names into an array if not already (happens when user selected only one character for a room)
+        let firstLine = '{"user_name":"'+user_name+'","character_names":'+JSON.stringify(characterNames)+',"create_date":'+createDate+',"notes":"'+notes+'","notes_type":"'+notes_type+'","scenario":"'+scenario+'"}';
+        fileContent += firstLine;
+        fileContent += chat.length ? "\n" : "";
+        chat.forEach(function(chat_msg, i) {
+            if(i < chat.length-1) // If the current chat message is not the last message
+                fileContent += JSON.stringify(chat_msg) + "\n";
+            else
+                fileContent += JSON.stringify(chat_msg);
+        });
+        fs.writeFileSync(roomsPath+filedir+fileExtension, fileContent);
+        // console.log(firstLine);
+    } catch (err) {
+        throw err;
+    }
+}
+
 app.post("/getcharacters", jsonParser, async function(request, response) {
     try {
         const files = await fs.promises.readdir(charactersPath);
@@ -836,6 +1032,77 @@ app.post("/getcharacters", jsonParser, async function(request, response) {
         }
 
         response.send(JSON.stringify(characters));
+    } catch (error) {
+        console.error(error);
+        response.sendStatus(500);
+    }
+});
+
+// The function already appends the roomsPath before the roomFile value, expected with extension
+async function roomRead(roomFile) {
+    // console.log(roomsPath+roomFile);
+    return fs.readFileSync(roomsPath+roomFile, {encoding: 'utf8'}).split('\n').map(json5.parse);
+}
+
+app.post("/getrooms", jsonParser, async function(request, response) {
+    try {
+        // const files = fs.readdirSync(roomsPath, {encoding: 'utf8'});
+        const files = await fs.promises.readdir(roomsPath);
+        let roomFiles = files.filter(file => file.endsWith('.jsonl'));
+        if(request.body && request.body.filename) {
+            roomFiles = roomFiles
+                .filter(file => file
+                    .replace(/\.[^\.]*/, "").toLowerCase() === request.body.filename.toLowerCase()
+                );
+        }
+        const rooms = {};
+        let i = 0;
+
+        for (const item of roomFiles) {
+            let jsonObject = {};
+            
+            // fs.readFileSync(roomsPath+item, 'utf8', (err, data) => {
+            //     if (err) {
+            //         response.send(err);
+            //         return;
+            //     }
+            //     //console.log(data);
+            //     const lines = data.split('\n');
+
+            //     // Iterate through the array of strings and parse each line as JSON
+            //     jsonObject.chat = lines.map(json5.parse);
+            //     try {
+            //         jsonObject.filename = item;
+            //         rooms[i] = jsonObject;
+            //         i++;
+            //     } catch (error) {
+            //         if (error instanceof SyntaxError) {
+            //             console.error("Room info from index " +i+ " is not valid JSON!", error);
+            //         } else {
+            //             console.error("An unexpected error loading room index " +i+ " occurred.", error);
+            //         }
+            //         console.error("Pre-parsed room data:");
+            //         console.error(jsonObject);
+            //     }
+
+            //     console.log(rooms);
+            // });
+
+            const stats = await fs.promises.stat(roomsPath+item);
+            if(!stats.isDirectory())
+            {
+                jsonObject.chat = await roomRead(item);
+                // jsonObject = (await fs.promises.readFile(roomsPath+item, {encoding: 'utf8'})).split('\n').map(json5.parse);
+                jsonObject.filename = item;
+                rooms[i] = jsonObject;
+                // console.log(rooms);
+                i++;
+                // console.log(rooms);
+            }
+        }
+
+        // console.log(rooms);
+        response.send(JSON.stringify(rooms));
     } catch (error) {
         console.error(error);
         response.sendStatus(500);
@@ -1191,7 +1458,7 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
     });
     
     //Styles
-    const designs = fs.readdirSync('public/designs')
+    const templates = fs.readdirSync('public/templates')
         .filter(file => file.endsWith('.css'))
         .sort();
     
@@ -1200,7 +1467,7 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         charaCloudServer: charaCloudServer,
         characterFormat: characterFormat,
         settings,
-        designs,
+        templates,
         koboldai_settings,
         koboldai_setting_names,
         novelai_settings,
@@ -1227,12 +1494,12 @@ app.post('/loadfolders', jsonParser, (request, response) => {
 
 app.post("/savestyle", jsonParser, function(request, response){
     const this_style = request.body.style;
-    let file_data = '@import "../designs/classic.css";';
+    let file_data = '@import "../templates/classic.css";';
     if(this_style != 'classic.css'){
-        file_data = '@import "../designs/classic.css";@import "../designs/'+this_style+'";';
+        file_data = '@import "../templates/classic.css";@import "../templates/'+this_style+'";';
     }
 
-    fs.writeFile('public/css/designs.css', file_data, 'utf8', function(err) {
+    fs.writeFile('public/css/templates.css', file_data, 'utf8', function(err) {
         if(err) {
             response.send(err);
             return console.log(err);
@@ -1308,16 +1575,16 @@ app.post("/getstatus_novelai", jsonParser, function(request, response_getstatus_
         }
         if(response.statusCode == 401){
             console.log('Access Token is incorrect.');
-            response_getstatus_novel.send({error: true});
+            response_getstatus_novel.send({error: true, error_message: "Access token is incorrect."});
         }
         if(response.statusCode == 500 || response.statusCode == 501 || response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507){
             console.log(data);
-            response_getstatus_novel.send({error: true});
+            response_getstatus_novel.send({error: true, error_message: "Error. Status code: " + response.statusCode});
         }
     }).on('error', function (err) {
         //console.log('');
 	//console.log('something went wrong on the request', err.request.options);
-        response_getstatus_novel.send({error: true});
+        response_getstatus_novel.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
 
@@ -1370,24 +1637,24 @@ app.post("/generate_novelai", jsonParser, function(request, response_generate_no
         }
         if(response.statusCode == 400){
             console.log('Validation error');
-            response_generate_novel.send({error: true});
+            response_generate_novel.send({error: true, error_message: "Validation error"});
         }
         if(response.statusCode == 401){
             console.log('Access Token is incorrect');
-            response_generate_novel.send({error: true});
+            response_generate_novel.send({error: true, error_message: "Access token is incorrect."});
         }
         if(response.statusCode == 402){
             console.log('An active subscription is required to access this endpoint');
-            response_generate_novel.send({error: true});
+            response_generate_novel.send({error: true, error_message: "An active subscription is required to access this endpoint"});
         }
         if(response.statusCode == 500 || response.statusCode == 409){
             console.log(data);
-            response_generate_novel.send({error: true});
+            response_generate_novel.send({error: true, error_message: "Error. Status code: " + response.statusCode});
         }
     }).on('error', function (err) {
         //console.log('');
 	//console.log('something went wrong on the request', err.request.options);
-        response_generate_novel.send({error: true});
+        response_generate_novel.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
 
@@ -1450,17 +1717,21 @@ app.post("/generate_horde", jsonParser, function(request, response_generate_hord
         }
         if(response.statusCode == 401){
             console.log('Validation error');
-            response_generate_horde.send({error: true});
+            response_generate_horde.send({error: true, error_message: "Validation error."});
         }
         if(response.statusCode == 429 || response.statusCode == 503 || response.statusCode == 507){
             console.log(data);
-            response_generate_horde.send({error: true});
+            if(data.detail && data.detail.msg) {
+                response_generate.send({error: true, error_message: data.detail.msg});
+            } else {
+                response_generate.send({error: true, error_message: "Error. Status code: " + response.statusCode});
+            }
         }
     }).on('error', function (err) {
         hordeActive = false;
         console.log(err);
         //console.log('something went wrong on the request', err.request.options);
-        response_generate_horde.send({error: true});
+        response_generate_horde.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
 
@@ -1527,10 +1798,10 @@ app.post("/getstatus_horde", jsonParser, function(request, response_getstatus_ho
             response_getstatus_horde.send(data);//data);
         } else {
             console.log(data);
-            response_getstatus_horde.send({error: true});
+            response_getstatus_horde.send({error: true, error_message: "Could not fetch model list."});
         }
     }).on('error', function (err) {
-        response_getstatus_horde.send({error: true});
+        response_getstatus_horde.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
 
@@ -1546,37 +1817,36 @@ app.get("/gethordeinfo", jsonParser, function(request, response){
 
 //***********Open.ai API
 
-app.post("/getstatus_openai", jsonParser, function(request, response_getstatus_openai = response){
+app.post("/getstatus_openai", jsonParser, function(request, response_getstatus_openai){
     if(!request.body) return response_getstatus_openai.sendStatus(400);
     api_key_openai = request.body.key;
+    api_url_openai = request.body.url;
     var args = {};
-    if(isUrl(api_key_openai)){
-        return response_getstatus_openai.status(200).send({});
-    }else{
+    if(api_key_openai && api_key_openai.length) {
         args = {
             headers: {"Authorization": "Bearer " + api_key_openai}
         };
     }
-    client.get(api_openai+"/engines/text-davinci-003", args, function (data, response) {
+    client.get(api_url_openai+"/models", args, function (data, response) {
         if(response.statusCode == 200){
             response_getstatus_openai.send(data);
         }
         if(response.statusCode == 401){
             console.log('Invalid Authentication');
-            response_getstatus_openai.send({error: true});
+            response_getstatus_openai.send({error: true, error_message: "Invalid Authentication."});
         }
         if(response.statusCode == 429){
             console.log('Rate limit reached for requests');
-            response_getstatus_openai.send({error: true});
+            response_getstatus_openai.send({error: true, error_message: "Rate limit reached for requests."});
         }
         if(response.statusCode == 500){
             console.log('The server had an error while processing your request');
-            response_getstatus_openai.send({error: true});
+            response_getstatus_openai.send({error: true, error_message: "The server had an error while processing your request."});
         }
     }).on('error', function (err) {
         //console.log('');
 	//console.log('something went wrong on the request', err.request.options);
-        response_getstatus_openai.send({error: true});
+        response_getstatus_openai.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
 
@@ -1596,7 +1866,9 @@ app.post("/generate_openai", jsonParser, function(request, response_generate_ope
         "stop": request.body.stop
     };
     let request_path = '';
-    if(request.body.model === 'gpt-3.5-turbo' || request.body.model === 'gpt-3.5-turbo-0301' || request.body.model === 'gpt-4' || request.body.model === 'gpt-4-32k'){
+
+    if(isChatModel(request.body.model)){
+
         request_path = '/chat/completions';
         data.messages = request.body.messages;
         
@@ -1606,18 +1878,8 @@ app.post("/generate_openai", jsonParser, function(request, response_generate_ope
 
     }
     let args = {};
-    let api_url = "";
-    if(isUrl(api_key_openai)){
-        api_url = api_key_openai;
-        args = {
-            data: data,
-            headers: {"Content-Type": "application/json"},
-            requestConfig: {
-                timeout: connectionTimeoutMS
-            }
-        };
-    }else{
-        api_url = api_openai;
+
+    if(api_key_openai && api_key_openai.length){
         args = {
             data: data,
             headers: {"Content-Type": "application/json", "Authorization": "Bearer " + api_key_openai},
@@ -1625,45 +1887,80 @@ app.post("/generate_openai", jsonParser, function(request, response_generate_ope
                 timeout: connectionTimeoutMS
             }
         };
+    }else{
+        args = {
+            data: data,
+            headers: {"Content-Type": "application/json"},
+            requestConfig: {
+                timeout: connectionTimeoutMS
+            }
+        };
     }
-    client.post(api_url+request_path,args, function (data, response) {
+    client.post(api_url_openai+request_path,args, function (data, response) {
         try {
-            if(request.body.model === 'gpt-3.5-turbo' || request.body.model === 'gpt-3.5-turbo-0301' || request.body.model === 'gpt-4' || request.body.model === 'gpt-4-32k'){
+
+            if(isChatModel(request.body.model)){
+
                 console.log(data);
-                if(data.choices[0].message !== undefined){
-                    console.log(data.choices[0].message);
+
+                if(!data.choices || !data.choices[0]) {
+                    let message = null;
+                    let code = null;
+                    if(data.error) {
+                        message = data.error.message;
+                        code = data.error.type;
+                    }
+                    response_generate_openai.send({ error: true, error_message: message, error_code: code });
+                    return;
                 }
 
 
+                if(data.choices[0].message !== undefined){
+                    console.log(data.choices[0].message);
+                }
             }else{
                 console.log(data);
             }
             console.log(response.statusCode);
             if(response.statusCode <= 299){
-                response_generate_openai.send(data);
+                return response_generate_openai.send(data);
             }
             if(response.statusCode == 401){
                 console.log('Invalid Authentication');
-                response_generate_openai.send({error: true});
+                return response_generate_openai.send({error: true, error_code: 401, error_message: "Invalid Authentication"});
+            }
+            if(response.statusCode == 404){
+                console.log('Model not found');
+                return response_generate_openai.send({error: true, error_code: 404, error_message: "Model not found"});
             }
             if(response.statusCode == 429){
                 console.log('Rate limit reached for requests');
-                response_generate_openai.send({error: true});
+                return response_generate_openai.send({error: true, error_code: 429, error_message: "Rate limit reached for requests"});
             }
             if(response.statusCode == 500){
                 console.log('The server had an error while processing your request');
-                response_generate_openai.send({error: true});
+                return response_generate_openai.send({error: true, error_code: 500, error_message: "The server had an error while processing your request"});
             }
+            console.log('Unique error');
+            return response_generate_openai.send({error: true, error_code: response.statusCode, error_message: "Unique error"});
         }catch (error) {
             console.log("An error occurred: " + error);
-            response_generate_openai.send({error: true});
+            response_generate_openai.send({error: true, error_message: error});
         }
     }).on('error', function (err) {
         //console.log('');
 	//console.log('something went wrong on the request', err.request.options);
-        response_generate_openai.send({error: true});
+        response_generate_openai.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
+
+function isChatModel(model_openai){
+    if (model_openai === 'text-davinci-003' || model_openai === 'text-davinci-002' || model_openai === 'text-curie-001' || model_openai === 'text-babbage-001' || model_openai === 'text-ada-001' || model_openai === 'code-davinci-002') {
+        return false;
+    } else {
+        return true;
+    }
+}
 
 app.post("/getallchatsofchatacter", jsonParser, function(request, response){
     if(!request.body) return response.sendStatus(400);
@@ -2002,6 +2299,101 @@ app.post("/deletechat", jsonParser, function(request, response){
     }
 
 });
+//System Prompt
+app.post("/systemprompt_save", jsonParser, function(request, response){
+    try {
+        if (!request.body)
+            return response.sendStatus(400);
+
+        let {preset_name} = request.body;
+        // Save the system_prompt to a JSON file
+        const filePath = `public/System Prompts/${preset_name}.json`;
+        const data = JSON.stringify(request.body);
+        fs.writeFileSync(filePath, data);
+
+        return response.status(200).send({res: true});
+        
+    } catch (err) {
+        console.error(err);
+        return response.status(400).send({error: err});
+    }
+});
+
+app.post("/systemprompt_get", jsonParser, function(request, response){
+    try {
+        /*
+        const filePath = 'public/System Prompts/system_prompt.json';
+        const data = fs.readFileSync(filePath, 'utf8');
+        //const system_prompt = JSON.parse(data);
+        return response.status(200).send(data);
+        */
+        const folderPath = 'public/System Prompts';
+        const files = fs.readdirSync(folderPath);
+
+        const data = {};
+        files.forEach(file => {
+            const filePath = path.join(folderPath, file);
+            const fileData = fs.readFileSync(filePath, 'utf8');
+            const key = path.parse(file).name;
+            const json = JSON.parse(fileData);
+            data[key] = json;
+        });
+        return response.status(200).send(data);
+        
+    } catch (err) {
+        console.error(err);
+        return response.status(400).send({error: err});
+    }
+});
+
+app.post("/systemprompt_new", jsonParser, function(request, response){
+    try {
+        if (!request.body)
+            return response.sendStatus(400);
+
+        let {preset_name} = request.body;
+        preset_name = sanitize_filename(preset_name);
+        if (preset_name.length === 0) {
+            return response.status(400).send({error: "Wrong filename"});
+        }
+        const filePath = `public/System Prompts/${preset_name}.json`;
+        
+        if (fs.existsSync(filePath)) {
+            return response.status(400).send({error: "File already exists"});
+        }
+        
+        const data = JSON.stringify(request.body);
+        fs.writeFileSync(filePath, data);
+
+        return response.status(200).send({preset_name: preset_name});
+        
+    } catch (err) {
+        console.error(err);
+        return response.status(400).send({error: err});
+    }
+});
+
+app.post("/systemprompt_delete", jsonParser, function(request, response){
+    try {
+        if (!request.body || !request.body.preset_name)
+            return response.sendStatus(400);
+
+        let {preset_name} = request.body;
+        const filePath = `public/System Prompts/${preset_name}.json`;
+
+        if(fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        } else {
+            return response.status(400).send({error: `File ${filePath} not found`});
+        }
+
+        return response.status(200).send({res: true});
+        
+    } catch (err) {
+        console.error(err);
+        return response.status(400).send({error: err});
+    }
+});
 //Server start
 module.exports.express = express;
 module.exports.path = path;
@@ -2032,6 +2424,7 @@ module.exports.charactersPath = charactersPath;
 
 
 const charaCloudRoute = require('./routes/characloud');
+const e = require('express');
 
 app.use('/api/characloud', charaCloudRoute);
 

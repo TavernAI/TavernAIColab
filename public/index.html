@@ -16,7 +16,7 @@
     <script src="scripts/showdown-xss-filter.js"></script>
     
     
-    <link id="base_theme" rel="stylesheet" type="text/css" href="css/designs.css">
+    <link id="base_theme" rel="stylesheet" type="text/css" href="css/templates.css">
     <link rel="stylesheet" href="css/bg_load.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <script type=module>
@@ -34,6 +34,13 @@
 
     <script src="class/charaCloud.js"></script>
     <script type=module src="script.js"></script>
+
+    <style>
+        #characters_rooms_switch_button:hover {
+            background-color: #fff1;
+            transition: background-color 0.2s;
+        }
+    </style>
     
         
 <title>Tavern.AI</title>
@@ -244,26 +251,34 @@
                             <input type="range" class="range_bar" id="amount_gen_openai" name="volume" min="16" max="512" step="1">
                         </div>
                         <div>
-                            <h4 class="h4_menu_title">Context Size</h4><h5 id="max_context_counter_openai" class="range_counter">select</h5>
+                            <div>
+                                <h4 class="h4_menu_title">Context Size</h4><h5 id="max_context_counter_openai" style="display: inline-block" class="range_counter">select</h5>
+                                <div id="proxy_set_context_size_button"><a>(set)</a></div>
+                            </div>
                             <input type="range" class="range_bar" id="max_context_openai" name="volume" min="1024" max="4096" step="1">
                         </div>
                     </div>
-
-                    <div>
-                        <h4 class="h4_menu_title">OpenAI System prompt</h4>
-                        <h5 class="h5_menu_help">Defines how the model will behave (<a href="/notes/20" target="_blank">?</a>)</h5>
+                    <div id="system_prompt">
+                        <div>
+                            <h4 class="h4_menu_title">System prompt</h4>
+                            <h5 class="h5_menu_help">Defines how the model will behave (<a href="/notes/20" target="_blank">?</a>)</h5>
+                            <select id="system_prompt_preset_selector" class="menu_select">
+                            </select>
+                            <input id="system_prompt_new_button" type="submit" value="New preset">
+                            <input id="system_prompt_delete_button" type="submit" value="Delete">
+                        </div>
+                        <textarea id="system_prompt_textarea" placeholder=""></textarea>
                     </div>
-                    <textarea id="openai_system_prompt_textarea" placeholder=""></textarea>
                     <div>
-                        <h4 class="h4_menu_title">OpenAI Jailbreak</h4>
-                        <h5 class="h5_menu_help">Jailbreak for OpenAI (<a href="/notes/23" target="_blank">?</a>)</h5>
+                        <h4 class="h4_menu_title">Jailbreak</h4>
+                        <h5 class="h5_menu_help">Jailbreak helps to circumvent censorship restrictions (<a href="/notes/23" target="_blank">?</a>)</h5>
                     </div>
-                    <textarea id="openai_jailbreak_prompt_textarea" placeholder=""></textarea>
+                    <textarea id="jailbreak_prompt_textarea" placeholder=""></textarea>
                     <div>
-                        <h4 class="h4_menu_title">OpenAI additional Jailbreak</h4>
-                        <h5 class="h5_menu_help">Additional Jailbreak for OpenAI (<a href="/notes/24" target="_blank">?</a>)</h5>
+                        <h4 class="h4_menu_title">User Jailbreak</h4>
+                        <h5 class="h5_menu_help">An additional Jailbreak for circumventing censorship (<a href="/notes/24" target="_blank">?</a>)</h5>
                     </div>
-                    <textarea id="openai_jailbreak2_prompt_textarea" placeholder=""></textarea>
+                    <textarea id="user_jailbreak_prompt_textarea" placeholder=""></textarea>
 
                 </div>
                 <div id="master_settings_toggle_block">
@@ -463,6 +478,24 @@
                 <input id="character_name_pole" name="ch_name" class="text_pole chareditor-name-input" type="text" maxlength="120" size="35" value="" autocomplete="off">
                 </div>
                 
+                <div id="room_character_select_div" class="room-character-select-div" style="display: none;">
+                    <h4 class="h4_menu_title">Characters</h4>
+                    <br>
+                    <div class="room-character-selected-items-div">
+                        <h5 class="h5_menu_help">Characters selected</h5>
+                        <div id="room_character_selected_items" class="room-character-selected-items text_pole" style="min-height: 5em; display: flex; flex-wrap: wrap;">
+                            
+                        </div>
+                    </div>
+                    <br>
+                    <div class="room-character-select-items-div">
+                        <h5 class="h5_menu_help">Characters available</h5>
+                        <div id="room_character_select_items" class="room-character-select-items text_pole" style="display: flex; flex-wrap: wrap;">
+                            
+                        </div>
+                    </div>
+                </div>
+
                 <div id="avatar_div" class="avatar_div">
                     
                     <div id="avatar_div_container" class="avatar"><img src="img/fluffy.png" alt="avatar" class="chareditor-avatar-preview"></div><input type="file" id="add_avatar_button" class="chareditor-avatar" name="avatar" accept="image/png, image/jpeg, image/jpg, image/gif, image/bmp, image/webp">
@@ -479,8 +512,16 @@
                     <textarea class="chareditor-description-text" name="description" placeholder=""></textarea>
                 </div>
 
-                <h4 class="h4_menu_title">First message</h4><h5 class="h5_menu_help">First message from the character (<a href="/notes/3" target="_blank">?</a>)</h5>
-                <textarea id="firstmessage_textarea" name="first_mes" class="chareditor-firstmessage-text" placeholder=""></textarea>
+                <div>
+                    <h4 class="h4_menu_title">First message</h4><h5 class="h5_menu_help">First message from the character (<a href="/notes/3" target="_blank">?</a>)</h5>
+                    <textarea id="firstmessage_textarea" name="first_mes" class="chareditor-firstmessage-text" placeholder=""></textarea>
+                </div>
+
+                <div id="room_scenario_div" style="display: none;">
+                    <h4 class="h4_menu_title">Scenario</h4>
+                    <h5 class="h5_menu_help">Circumstances and context of the room (<a href="/notes/12" target="_blank">?</a>)</h5>
+                    <input id="room_scenario" name="room_scenario" class="text_pole room-scenario" type="text" maxlength="9999" size="40" value="" autocomplete="off">
+                </div>
 
                 <input id="selected_chat_pole" name="chat" class="text_pole" type="hidden" maxlength="999" size="2" value="" autocomplete="off">
                 <input name="create_date" class="text_pole" type="hidden" maxlength="999" size="2" value="" autocomplete="off">
@@ -504,6 +545,7 @@
                 <option value="horde">Kobold Horde</option>
                 <option value="novel">NovelAI</option>
                 <option value="openai">OpenAI</option>
+                <option value="proxy">Reverse Proxy</option>
             </select>
             <div id="kobold_api">
                 <div id="kobold_api_logo"><a href="https://github.com/KoboldAI/KoboldAI-Client" target="_blank"><img src="img/kobold.png"></a></div>
@@ -586,9 +628,14 @@
             </div>
             <div id="openai_api">
                 <div id="openai_api_logo"><a href="https://openai.com" target="_blank"><img src="img/openai.png"></a></div>
-                <form  action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                    <h4 class="h4_menu_title">API key or Proxy</h4><h5 class="h5_menu_help">Where to get (<a href="/notes/19" target="_blank">?</a>)</h5>
-                    <input id="api_key_openai" name="api_key_openai" class="text_pole" type="text" maxlength="500" size="35" value="" autocomplete="off">
+                <form  action="javascript:void(null);" method="post" enctype="multipart/form-data" id="openai_auth">
+                    <h4 class="h4_menu_title" id="openai_api_h4_title">API address and password</h4><h5 class="h5_menu_help">Where to get (<a href="/notes/19" target="_blank">?</a>)</h5>
+                    <div id="openai_proxy_adress_block">
+                        <input id="api_url_openai" name="api_url_openai" class="text_pole" value="https://api.openai.com/v1" placeholder="https://api.openai.com/v1" type="text" maxlength="500" size="35" autocomplete="off">
+                        <img src="../img/revert.png" id="default_openai_url_button">
+                        <br>
+                    </div>
+                    <input id="api_key_openai" name="api_key_openai" class="text_pole" maxlength="500" size="35" value="" autocomplete="off" placeholder="API key or Prpxy password">
                     <input id="api_button_openai" type="submit" value="Connect">
                     <img id="api_loading_openai" src="img/load.svg" >
                 </form>
@@ -596,14 +643,17 @@
                     <div id="online_status_indicator4" class="online_status_indicator_offline"></div><div id="online_status_text4">No connection...</div>
                 </div>
                 <div>
-                <h4 class="h4_menu_title">Model</h4><h5 class="h5_menu_help">OpenAI models (<a href="/notes/13" target="_blank">?</a>)</h5>
+                <h4 class="h4_menu_title">Model</h4><h5 class="h5_menu_help" id="h5_model_openai_help">OpenAI models (<a href="/notes/13" target="_blank">?</a>)</h5>
                     <select id="model_openai_select" class="menu_select">
                         <option value="gpt-4">gpt-4</option>
                         <option value="gpt-4-32k">gpt-4-32k</option>
                         <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                        <option value="gpt-3.5-turbo-0301">gpt-3.5-turbo-0301</option>
+                        <option value="gpt-3.5-turbo-16k">gpt-3.5-turbo-16k</option>
                         <option value="text-davinci-003">text-davinci-003</option>
                         <option value="text-davinci-002">text-davinci-002</option>
+                        <option value="text-curie-001">text-curie-001</option>
+                        <option value="text-babbage-001">text-babbage-001</option>
+                        <option value="text-ada-001">text-ada-001</option>
                         <option value="code-davinci-002">code-davinci-002</option>
                     </select>
                 </div>
@@ -648,24 +698,31 @@
             
         </div>
         <div id="rm_charaters_block" class="right_menu">
-            
-            <div id="rm_button_create" class="right_menu_title_button"><h2>+New Character</h2></div>
-            <div id="rm_button_import" class="right_menu_title_button"><h2>
-                <label id="character-button-import" class="right_menu">+Import
-                    <form id="form_import"  action="javascript:void(null);" method="post" enctype="multipart/form-data">
-                        <input type="file" id="character_import_file" accept=".json, image/png, image/webp" name="avatar" multiple="true">
-                        <input id="character_import_file_type" name="file_type" class="text_pole" type="text" maxlength="999" size="2" value="" autocomplete="off">
-                    </form>
-                </label>
-            </h2></div>
-            <div id="character-button-new-folder" class="right_menu_title_button"><h2>+New Folder</h2></div>
-            <div>
-                <input id="rm_search_bar" name="rm_search_bar" class="text_pole" type="text" size="35" value="" autocomplete="off" placeholder="search...">
-                <select id="rm_folder_order" title="Sorting order">
-                </select>
-                
+
+            <div><button id="characters_rooms_switch_button" type="submit" class="chareditor-button-online"><span id='characters_rooms_switch_button_characters_text'>Characters</span>/<span id='characters_rooms_switch_button_rooms_text'>Rooms</span></button></div>
+            <div id="character_list">
+                <div id="rm_button_create" class="right_menu_title_button"><h2>+New Character</h2></div>
+                <div id="rm_button_import" class="right_menu_title_button"><h2>
+                    <label id="character-button-import" class="right_menu">+Import
+                        <form id="form_import"  action="javascript:void(null);" method="post" enctype="multipart/form-data">
+                            <input type="file" id="character_import_file" accept=".json, image/png, image/webp" name="avatar" multiple="true">
+                            <input id="character_import_file_type" name="file_type" class="text_pole" type="text" maxlength="999" size="2" value="" autocomplete="off">
+                        </form>
+                    </label>
+                </h2></div>
+                <div id="character-button-new-folder" class="right_menu_title_button"><h2>+New Folder</h2></div>
+                <div>
+                    <input id="rm_search_bar" name="rm_search_bar" class="text_pole" type="text" size="35" value="" autocomplete="off" placeholder="search...">
+                    <select id="rm_folder_order" title="Sorting order">
+                    </select>
+                    
+                </div>
+                <ul id="rm_print_charaters_block"></ul>
             </div>
-            <ul id="rm_print_charaters_block"></ul>
+            <div id="room_list" style="display: none;">
+                <div id="rm_button_create_room" class="right_menu_title_button"><h2>+Create Room</h2></div>
+                <ul id="rm_print_rooms_block" class="folder" style="list-style: none; padding-left: 0;"></ul>
+            </div>
         </div>
         <div id="rm_info_block" class="right_menu">
             <div id="rm_info_panel">
@@ -686,8 +743,14 @@
                 <div id="chat_header_char_name"></div>
                 <div id="chat_header_char_info">Wellcome to Tavern</div>
             </div>
+            <div id="chat_story_button">
+                <span id="chat_story_button_chat_text">Chat</span>/<span id="chat_story_button_story_text">Story</span>
+            </div>
         </div>
         <div id="chat"></div>
+        <div id="story">
+            <textarea id="story_textarea" placeholder="Story text..."></textarea>
+        </div>
         <div id="form_shell">
             
             <div id="dialogue_del_mes">
@@ -719,6 +782,7 @@
             <div id="hordeInfo" class="hidden">
                 <span id="hordeQueue"></span>
             </div>
+            
         </div>
     </div>
     
