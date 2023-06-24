@@ -1366,7 +1366,6 @@ $(document).ready(function(){
             else
                 Rooms.setActiveCharacterId(chat); // Needs to be done since we don't know the latest message made by a character
         } 
-        name2 = Characters.id[Characters.selectedID].name;
         generateType = type;
         // HORDE
         if (main_api == 'horde' && horde_model == '') {
@@ -1383,12 +1382,15 @@ $(document).ready(function(){
             this_gap_holder = parseInt(amount_gen_openai)+this_gap_holder;
         var textareaText = '';
         tokens_already_generated = 0;
-        if(!free_char_name_mode){
-            message_already_generated = name2+': ';
-        }else{
-            message_already_generated = '';
-        }
+
+
         if(online_status != 'no_connection' && Characters.selectedID != undefined){
+            name2 = Characters.id[Characters.selectedID].name;
+            if (!free_char_name_mode) {
+                message_already_generated = name2 + ': ';
+            } else {
+                message_already_generated = '';
+            }
             Characters.id[Characters.selectedID].last_action_date = Date.now();
             $('#rm_folder_order').change();
             if(!is_room)
@@ -4213,6 +4215,7 @@ $(document).ready(function(){
                     
                     model_openai = settings.model_openai;
                     model_proxy = settings.model_proxy;
+                    
                     if(main_api === 'openai'){
                         $('#model_openai_select option[value="'+model_openai+'"]').attr('selected', 'true');
                     }else if(main_api === 'proxy'){
@@ -5606,13 +5609,18 @@ $(document).ready(function(){
                                 value: 'gpt-3.5-turbo',
                                 text: 'gpt-3.5-turbo'
                             }));
+                            let is_mode_exist = false;
                             data.data.forEach(function(item, i){
+                                if(model_proxy === item.id) is_mode_exist = true;
                                 $('#model_openai_select').append($('<option>', {
                                     value: item.id,
                                     text: item.id
                                 }));
                             });
-                            $('#model_openai_select option[value="'+model_proxy+'"]').attr('selected', 'true');
+                            if(!is_mode_exist){
+                                model_proxy = 'gpt-3.5-turbo';
+                            }
+                            $('#model_openai_select').val(model_proxy);
                         }
                     }
                     setPygmalionFormating();
