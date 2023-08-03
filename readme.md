@@ -1,4 +1,4 @@
-### TavernAI is a adventure atmospheric chat (KoboldAI, NovelAI, Pygmalion, OpenAI)
+### TavernAI is a adventure atmospheric chat (KoboldAI, NovelAI, Pygmalion, OpenAI,  Text-gen webUI)
 Examples of interface and output:
 <br><img src="readme/1.png" height="200" /><img src="readme/4.png" height="200" /><img src="readme/5.png" height="200" />
 
@@ -13,14 +13,19 @@ Examples of interface and output:
 ## Features
 * Creating characters with personality setup
 * Online character library
-* Choosing name and avatar for your character
-* Deleting and regenerating messages
-* Editing any messages
-* Works with various AI models
-* Importing chats from CAI
-* More longer messages from characters
+* Supporting chat with multiple characters simultaneously
+* Flexible settings for AI models
+* Story mode
+* World Info
+* Swipes
 * Choosing atmospheric backgrounds
-* Creating and easy choosing preset settings
+* Editing/Deleting/Moving any messages
+* KoboldAI Support
+* Horde Support
+* NovelAI support
+* OpenAI Support
+* Reverse Proxy support
+
 
 ## How to install
 ### In Detail:
@@ -36,6 +41,7 @@ Examples of interface and output:
 * [Pygmalion](https://rentry.org/pygmalion-ai)
 * [chatGPT](https://chat.openai.com/)
 * [GPT-4](https://openai.com/research/gpt-4)
+* [Text-gen webUI] (https://github.com/oobabooga/text-generation-webui)
 
 ## Tips
 Use this button to edit the message<br><br>

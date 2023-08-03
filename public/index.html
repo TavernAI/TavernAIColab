@@ -155,6 +155,50 @@
             </div>
             <div id="master_settings">
 
+                <div id="master_settings_webui_block" class="master_settings_range_block">
+                    <div id="top_p_block_webui">
+                        <h4 class="range_title">Top P Sampling </h4><h5 id="top_p_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="top_p_webui" name="volume" min="0.0" max="1.0" step="0.01">
+                    </div>
+                    <div id="top_k_block_webui">
+                        <h4 class="range_title">Top K Sampling </h4><h5 id="top_k_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="top_k_webui" name="volume" min="0" max="100" step="1">
+                    </div>
+                    <div id="top_a_block_webui">
+                        <h4 class="range_title">Top A Sampling </h4><h5 id="top_a_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="top_a_webui" name="volume" min="0.0" max="1.0" step="0.01">
+                    </div>
+                    <div id="typical_block_webui">
+                        <h4 class="range_title">Typical Sampling </h4><h5 id="typical_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="typical_webui" name="volume" min="0.0" max="1.0" step="0.01">
+                    </div>
+                    <div id="tfs_block_webui">
+                        <h4 class="range_title">Tail Free Sampling </h4><h5 id="tfs_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="tfs_webui" name="volume" min="0.0" max="1.0" step="0.01">
+                    </div>
+                    <div id="rep_pen_size_block_webui">
+                        <h4 class="range_title">Repetition Penalty Range</h4><h5 id="rep_pen_size_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="rep_pen_size_webui" name="volume" min="0" max="2048" step="1">
+                    </div>
+                    <div id="nrns_block_webui">
+                        <h4 class="range_title">No Repeat Ngram Size</h4><h5 id="nrns_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="nrns_webui" name="volume" min="0" max="20" step="1">
+                    </div>
+                    <div id="amount_gen_block_webui">
+                        <h4 class="range_title">Amount of generation </h4><h5 id="amount_gen_counter_webui" class="range_counter">select</h5>
+                        <input type="range" class="range_bar" id="amount_gen_webui" name="volume" min="16" max="512" step="1">
+                    </div>
+                    <div id="max_context_block_webui">
+                        <div id="max_context_grid_webui">
+                            <div id="max_context_label_webui">
+                                <h4 class="range_title">Context Size</h4><h5 id="max_context_counter_webui" style="display: inline-block" class="range_counter">select</h5>
+                                <div id="webui_set_context_size_button"><a>(set)</a></div>
+                            </div>
+                            <input id="lock_context_size_webui" style="display: none;" type="checkbox" class="toggle_lock">
+                        </div>
+                        <input type="range" class="range_bar" id="max_context_webui" name="volume" min="512" max="8192" step="1">
+                    </div>
+                </div>
                 <div id="master_settings_koboldai_block" class="master_settings_range_block">
                     <div id="top_p_block">
                         <h4 class="range_title">Top P Sampling </h4><h5 id="top_p_counter" class="range_counter">select</h5>
@@ -191,11 +235,12 @@
                     <div id="max_context_block">
                         <div id="max_context_grid">
                             <div id="max_context_label">
-                                <h4 class="range_title">Context Size</h4><h5 id="max_context_counter" class="range_counter">select</h5>
+                                <h4 class="range_title">Context Size</h4><h5 id="max_context_counter" style="display: inline-block" class="range_counter">select</h5>
+                                <div id="kobold_set_context_size_button"><a>(set)</a></div>
                             </div>
                             <input id="lock_context_size" type="checkbox" class="toggle_lock">
                         </div>
-                        <input type="range" class="range_bar" id="max_context" name="volume" min="512" max="2048" step="1">
+                        <input type="range" class="range_bar" id="max_context" name="volume" min="512" max="8192" step="1">
                     </div>
                 </div>
                 <div id="master_settings_novelai_block" class="master_settings_range_block">
@@ -259,19 +304,34 @@
                         </div>
                     </div>
                     <div id="system_prompt">
-                        <div>
+                        <div style="display:grid;grid-template-columns: auto auto;position:relative;width:94%">
+                            <div>
                             <h4 class="h4_menu_title">System prompt</h4>
                             <h5 class="h5_menu_help">Defines how the model will behave (<a href="/notes/20" target="_blank">?</a>)</h5>
                             <select id="system_prompt_preset_selector" class="menu_select">
                             </select>
                             <input id="system_prompt_new_button" type="submit" value="New preset">
                             <input id="system_prompt_delete_button" type="submit" value="Delete">
+                            </div>
+                            <div style="position:absolute; bottom: -20px; right:0">
+                                <h5 id="system_depth_counter" class="range_counter">Depth</h5>
+                                <input style="margin-right: unset;" type="range" class="range_bar" id="system_depth_range" name="volume" min="0" max="34" step="1">
+                            </div>
                         </div>
+                        
                         <textarea id="system_prompt_textarea" placeholder=""></textarea>
+                        
+                        
                     </div>
-                    <div>
+                    <div style="display:grid;grid-template-columns: auto auto;position:relative;width:94%">
+                        <div>
                         <h4 class="h4_menu_title">Jailbreak</h4>
                         <h5 class="h5_menu_help">Jailbreak helps to circumvent censorship restrictions (<a href="/notes/23" target="_blank">?</a>)</h5>
+                        </div>
+                        <div style="position:absolute; bottom: -20px; right:0">
+                                <h5 id="jailbreak_depth_counter" class="range_counter">Depth 5</h5>
+                                <input style="margin-right: unset;" type="range" class="range_bar" id="jailbreak_depth_range" name="volume" min="0" max="34" step="1">
+                            </div>
                     </div>
                     <textarea id="jailbreak_prompt_textarea" placeholder=""></textarea>
                     <div>
@@ -488,6 +548,7 @@
                         </div>
                     </div>
                     <br>
+                    <button type="button" class="chareditor-button-room-add-character" id="room_select_more_chars_button" style="display: none;">Add More Characters</button>
                     <div class="room-character-select-items-div">
                         <h5 class="h5_menu_help">Characters available</h5>
                         <div id="room_character_select_items" class="room-character-select-items text_pole" style="display: flex; flex-wrap: wrap;">
@@ -546,6 +607,7 @@
                 <option value="novel">NovelAI</option>
                 <option value="openai">OpenAI</option>
                 <option value="proxy">Reverse Proxy</option>
+                <option value="webui">Text generation web UI</option>
             </select>
             <div id="kobold_api">
                 <div id="kobold_api_logo"><a href="https://github.com/KoboldAI/KoboldAI-Client" target="_blank"><img src="img/kobold.png"></a></div>
@@ -612,6 +674,7 @@
                     <option value="euterpe-v2">Euterpe</option>
                     <option value="krake-v2">Krake</option>
                     <option value="clio-v1">Clio</option>
+                    <option value="kayra-v1">Kayra</option>
                 </select>
                 <h4 class="h4_menu_title">Preset settings</h4><h5 class="h5_menu_help">Selecting settings (<a href="/notes/7" target="_blank">?</a>)</h5>
                 <select id="settings_perset_novel" class="menu_select">
@@ -631,7 +694,7 @@
                 <form  action="javascript:void(null);" method="post" enctype="multipart/form-data" id="openai_auth">
                     <h4 class="h4_menu_title" id="openai_api_h4_title">API address and password</h4><h5 class="h5_menu_help">Where to get (<a href="/notes/19" target="_blank">?</a>)</h5>
                     <div id="openai_proxy_adress_block">
-                        <input id="api_url_openai" name="api_url_openai" class="text_pole" value="" placeholder="api proxy adress" type="text" maxlength="500" size="35" autocomplete="off">
+                        <input id="api_url_openai" name="api_url_openai" class="text_pole" value="" placeholder="API Proxy url adress" type="text" maxlength="500" size="35" autocomplete="off">
                         <img src="../img/revert.png" id="default_openai_url_button">
                         <br>
                     </div>
@@ -660,6 +723,30 @@
                 <div id="range_block_openai">
                     <h4 class="h4_menu_title">Temperature </h4><h5 id="temp_counter_openai" class="range_counter">select</h5>
                     <input type="range" id="temp_openai" name="volume" min="0" max="2.0" step="0.01">
+                </div>
+            </div>
+            <div id="webui_api">
+                
+                <form  action="javascript:void(null);" method="post" enctype="multipart/form-data">
+
+                    <h4 class="h4_menu_title">API url</h4><h5 class="h5_menu_help">Example: http://127.0.0.1:5000 </h5>
+                    <input id="api_url_text_webui" name="api_url_webui" class="text_pole" type="text" maxlength="500" size="35" value="http://127.0.0.1:5000" autocomplete="off">
+                    <input id="api_button_webui" type="submit" value="Connect">
+                    <img id="api_loading_webui" src="img/load.svg" >
+                </form>
+                <div id="online_status_webui">
+                    <div id="online_status_indicator_webui" class="online_status_indicator_offline"></div><div id="online_status_text_webui">No connection...</div>
+                </div>
+                <h4 class="h4_menu_title">Preset settings</h4><h5 class="h5_menu_help">Selecting settings (<a href="/notes/4_1" target="_blank">?</a>)</h5>
+                <select id="settings_perset_webui" class="menu_select">
+                </select>
+                <div id="range_block_webui">
+                    <h4 class="h4_menu_title">Temperature </h4><h5 id="temp_counter_webui" class="range_counter">select</h5>
+                    <input type="range" id="temp_webui" name="volume" min="0.1" max="2.0" step="0.01">
+                    <!--<h4>Amount generation </h4><h5 id="amount_gen_counter">select</h5>
+                    <input type="range" id="amount_gen" name="volume" min="16" max="512" step="1">-->
+                    <h4 class="h4_menu_title">Repetition Penalty </h4><h5 id="rep_pen_counter_webui" class="range_counter">select</h5>
+                    <input type="range" id="rep_pen_webui" name="volume" min="1" max="1.5" step="0.01">
                 </div>
             </div>
             <div id="additional_menu_settings">
@@ -741,7 +828,7 @@
                 </svg>
                 </div>
                 <div id="chat_header_char_name"></div>
-                <div id="chat_header_char_info">Wellcome to Tavern</div>
+                <div id="chat_header_char_info">Welcome to Tavern</div>
             </div>
             <div id="chat_story_button">
                 <span id="chat_story_button_chat_text">Chat</span>/<span id="chat_story_button_story_text">Story</span>
