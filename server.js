@@ -371,6 +371,122 @@ app.post("/generate", jsonParser, function(request, response_generate = response
         response_generate.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
     });
 });
+
+//**************WEBUI api
+app.post("/generate_webui", jsonParser, function(request, response_generate){
+    if(!request.body) return response_generate.sendStatus(400);
+    //console.log(request.body.prompt);
+    //const dataJson = json5.parse(request.body);
+    
+    //console.log(request.body);
+
+    let this_settings = {
+        prompt: request.body.prompt,
+        max_new_tokens: request.body.max_new_tokens,
+        preset: 'None',
+        do_sample: true,
+        temperature: request.body.temperature,
+        top_p: request.body.top_p,
+        typical_p: request.body.typical_p,
+        epsilon_cutoff: 0,
+        eta_cutoff: 0,
+        tfs: request.body.tfs,
+        top_a: request.body.top_a,
+        repetition_penalty: request.body.repetition_penalty,
+        repetition_penalty_range: request.body.repetition_penalty_range,
+        top_k: request.body.top_k,
+        min_length: 0,
+        no_repeat_ngram_size: request.body.no_repeat_ngram_size,
+        num_beams: 1,
+        penalty_alpha: 0,
+        length_penalty: 1,
+        early_stopping: false,
+        mirostat_mode: 0,
+        mirostat_tau: 5,
+        mirostat_eta: 0.1,
+
+        seed: -1,
+        add_bos_token: true,
+        truncation_length: request.body.truncation_length,
+        ban_eos_token: false,
+        skip_special_tokens: true,
+        stopping_strings: request.body.stopping_strings
+    };
+
+    console.log(this_settings);
+    var args = {
+        data: this_settings,
+        headers: { "Content-Type": "application/json" },
+        requestConfig: {
+            timeout: connectionTimeoutMS
+        }
+    };
+    client.post(api_server+"/v1/generate",args, function (data, response) {
+        if(response.statusCode == 200){
+            console.log(data);
+            response_generate.send(data);
+        }
+        if(response.statusCode == 422){
+            console.log('Validation error');
+            response_generate.send({error: true, error_message: "Validation error"});
+        }
+        if(response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507){
+            console.log(data);
+            if(data.detail && data.detail.msg) {
+                response_generate.send({error: true, error_message: data.detail.msg});
+            } else {
+                response_generate.send({error: true, error_message: "Error. Status code: " + response.statusCode});
+            }
+        }
+    }).on('error', function (err) {
+        console.log(err);
+	//console.log('something went wrong on the request', err.request.options);
+        response_generate.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
+    });
+});
+
+app.post("/tokenizer_webui", jsonParser, function(request, response_tokenizer){
+    if(!request.body) return response_generate.sendStatus(400);
+    //console.log(request.body.prompt);
+    //const dataJson = json5.parse(request.body);
+    
+    //console.log(request.body);
+
+    let this_data = {
+        prompt: request.body.prompt
+    };
+
+    var args = {
+        data: this_data,
+        headers: { "Content-Type": "application/json" },
+        requestConfig: {
+            timeout: connectionTimeoutMS
+        }
+    };
+    client.post(api_server+"/v1/token-count",args, function (data, response) {
+        if(response.statusCode == 200){
+            response_tokenizer.send(data);
+        }
+        if(response.statusCode == 422){
+            console.log('Validation error');
+            response_tokenizer.send({error: true, error_message: "Validation error"});
+        }
+        if(response.statusCode == 501 || response.statusCode == 503 || response.statusCode == 507){
+            console.log(data);
+            if(data.detail && data.detail.msg) {
+                response_tokenizer.send({error: true, error_message: data.detail.msg});
+            } else {
+                response_tokenizer.send({error: true, error_message: "Error. Status code: " + response.statusCode});
+            }
+        }
+    }).on('error', function (err) {
+        console.log(err);
+	//console.log('something went wrong on the request', err.request.options);
+        response_tokenizer.send({error: true, error_message: "Unspecified error while sending the request.\n" + err});
+    });
+});
+
+
 app.post("/savechat", jsonParser, function(request, response){
     //console.log(request.data);
     //console.log(request.body.bg);
@@ -391,6 +507,34 @@ app.post("/savechat", jsonParser, function(request, response){
             response.send({result: "ok"});
         }
     });
+    
+});
+app.post("/changechatname", jsonParser, function(request, response){
+    try {
+        let dir_name = String(request.body.character_filename).replace(`.${characterFormat}`,'');
+        let filePath = chatsPath+dir_name+"/"+request.body.chat_filename+'.jsonl';
+
+        //read
+        let fileContents = fs.readFileSync(filePath, 'utf8');
+        let lines = fileContents.split('\n');
+
+        let firstLine = JSON.parse(lines[0]);
+        firstLine.chat_name = request.body.chat_name;  
+        lines[0] = JSON.stringify(firstLine);
+
+        // Join updated lines 
+        fileContents = lines.join('\n');
+        //write
+        //let chat_data = request.body.chat;
+        //let jsonlData = chat_data.map(JSON.stringify).join('\n');
+        fs.writeFileSync(filePath, fileContents);
+
+        // Send response
+        response.send({result: "ok"});
+    }catch(err){
+        console.log(err);
+        return response.status(400).send(err);
+    }
     
 });
 app.post("/getchat", jsonParser, function(request, response){
@@ -428,7 +572,7 @@ app.post("/getchat", jsonParser, function(request, response){
                                 const lines = data.split('\n');
 
                                 // Iterate through the array of strings and parse each line as JSON
-                                const jsonData = lines.map(json5.parse);
+                                const jsonData = lines.filter(line => line && line.length).map(json5.parse);
                                 response.send(jsonData);
 
 
@@ -565,6 +709,37 @@ app.post("/getstatus", jsonParser, function(request, response_getstatus = respon
         response_getstatus.send({result: "no_connection"});
     });
 });
+app.post("/getstatus_webui", jsonParser, function(request, response_getstatus){
+    if(!request.body) return response_getstatus.sendStatus(400);
+    api_server = request.body.api_server_webui;
+    if(api_server.indexOf('localhost') != -1){
+        api_server = api_server.replace('localhost','127.0.0.1');
+    }
+    var args = {
+        headers: { "Content-Type": "application/json" }
+    };
+    client.get(api_server+"/v1/model",args, function (data, response) {
+        if(response.statusCode == 200){
+            if(data.result != "ReadOnly"){
+                
+                //response_getstatus.send(data.result);
+            }else{
+                data.result = "no_connection";
+            }
+        }else{
+            data.result = "no_connection";
+        }
+        response_getstatus.send(data);
+        //console.log(response.statusCode);
+        //console.log(data);
+        //response_getstatus.send(data);
+        //data.results[0].text
+    }).on('error', function (err) {
+        //console.log('');
+	//console.log('something went wrong on the request', err.request.options);
+        response_getstatus.send({result: "no_connection"});
+    });
+});
 function checkServer(){
     //console.log('Check run###################################################');
     api_server = 'http://127.0.0.1:5000';
@@ -586,7 +761,7 @@ function checkServer(){
 //***************** Main functions
 function checkCharaProp(prop) {
   return (String(prop) || '')
-      .replace(/[\u2018\u2019�?’]/g, "'")
+      .replace(/[\u2018\u2019‘’]/g, "'")
       .replace(/[\u201C\u201D“”]/g, '"');
 }
 function charaFormatData(data){
@@ -657,7 +832,7 @@ function charaFormatData(data){
     }else{
         short_description = data.short_description;
     }
-    let char = {public_id: checkCharaProp(data.public_id), public_id_short: checkCharaProp(data.public_id_short), user_name: checkCharaProp(data.user_name), user_name_view: checkCharaProp(data.user_name_view), name: name, description: checkCharaProp(data.description), short_description: checkCharaProp(short_description), personality: checkCharaProp(data.personality), first_mes: checkCharaProp(data.first_mes), chat: Date.now(), mes_example: checkCharaProp(data.mes_example), scenario: checkCharaProp(data.scenario), categories: categories, create_date_online: create_date_online, edit_date_online: edit_date_online, create_date_local: create_date_local, edit_date_local: edit_date_local, add_date_local: add_date_local, last_action_date: last_action_date, online: data.online, nsfw: data.nsfw};
+    let char = {public_id: checkCharaProp(data.public_id), public_id_short: checkCharaProp(data.public_id_short), user_name: checkCharaProp(data.user_name), user_name_view: checkCharaProp(data.user_name_view), name: name, description: checkCharaProp(data.description), short_description: checkCharaProp(short_description), personality: checkCharaProp(data.personality), first_mes: checkCharaProp(data.first_mes), chat: Date.now(), mes_example: checkCharaProp(data.mes_example), scenario: checkCharaProp(data.scenario), categories: categories, create_date_online: create_date_online, edit_date_online: edit_date_online, create_date_local: create_date_local, edit_date_local: edit_date_local, add_date_local: add_date_local, last_action_date: last_action_date, online: data.online, nsfw: data.nsfw, spec: "tavern_ai", spec_version: "1.0"};
     // Filtration
     if(data.public_id === undefined){ 
         char.public_id = uuid.v4().replace(/-/g, '');
@@ -1398,6 +1573,8 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
     const koboldai_setting_names = [];
     const novelai_settings = [];
     const novelai_setting_names = [];
+    const webui_settings = [];
+    const webui_setting_names = [];
     let settings = fs.readFileSync('public/settings.json', 'utf8',  (err, data) => {
     if (err) return response.sendStatus(500);
 
@@ -1457,6 +1634,30 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         novelai_setting_names.push(item.replace(/\.[^/.]+$/, ''));
     });
     
+    //WEBUI
+    const files3 = fs
+    .readdirSync('public/WebUI Settings')
+    .sort(
+      (a, b) =>
+        new Date(fs.statSync(`public/WebUI Settings/${b}`).mtime) -
+        new Date(fs.statSync(`public/WebUI Settings/${a}`).mtime)
+    );
+    
+    files3.forEach(item => {
+    const file3 = fs.readFileSync(
+        `public/WebUI Settings/${item}`,
+        'utf8',
+        (err, data) => {
+            if (err) return response.sendStatus(500);
+
+            return data;
+        }
+    );
+
+        webui_settings.push(file3);
+        webui_setting_names.push(item.replace(/\.[^/.]+$/, ''));
+    });
+    
     //Styles
     const templates = fs.readdirSync('public/templates')
         .filter(file => file.endsWith('.css'))
@@ -1471,7 +1672,9 @@ app.post('/getsettings', jsonParser, (request, response) => { //Wintermute's cod
         koboldai_settings,
         koboldai_setting_names,
         novelai_settings,
-        novelai_setting_names
+        novelai_setting_names,
+        webui_settings,
+        webui_setting_names
     });
 });
 
@@ -1821,6 +2024,9 @@ app.post("/getstatus_openai", jsonParser, function(request, response_getstatus_o
     if(!request.body) return response_getstatus_openai.sendStatus(400);
     api_key_openai = request.body.key;
     api_url_openai = request.body.url;
+    if(api_url_openai.indexOf('localhost') != -1){
+        api_url_openai = api_url_openai.replace('localhost','127.0.0.1');
+    }
     var args = {};
     if(api_key_openai && api_key_openai.length) {
         args = {
@@ -1990,20 +2196,33 @@ app.post("/getallchatsofchatacter", jsonParser, function(request, response){
                 input: fileStream,
                 crlfDelay: Infinity
             });
-
+            let firstLine; 
             let lastLine;
 
             rl.on('line', (line) => {
+                if (!firstLine) {
+                    firstLine = line;
+                }
                 lastLine = line;
             });
 
             rl.on('close', () => {
                 if(lastLine){
-                    let jsonData = json5.parse(lastLine);
-                    if(jsonData.name !== undefined){
+                    let firstLineData;
+                    let chat_name;
+                    if(firstLine){
+                        firstLineData = json5.parse(firstLine);
+                        if(firstLineData['chat_name']){
+                            chat_name = firstLineData['chat_name'];
+                        }
+                    }
+                    let lastLineData = json5.parse(lastLine);
+                    if(lastLineData.name !== undefined){
                         chatData[i] = {};
                         chatData[i]['file_name'] = file;
-                        chatData[i]['mes'] = jsonData['mes'];
+                        if(chat_name) chatData[i]['chat_name'] = chat_name;
+                        chatData[i]['mes'] = lastLineData['mes'];
+                        chatData[i]['mes_send_date'] = lastLineData['send_date'];
                         ii--;
                         if(ii === 0){ 
                             response.send(chatData);
@@ -2069,6 +2288,7 @@ app.post("/importcharacter", urlencodedParser, async function(request, response)
                 try{
                     var img_data = await charaRead('./uploads/'+filedata.filename, format);
                     let jsonData = json5.parse(img_data);
+                    if(jsonData.spec === "chara_card_v2") jsonData = parseV2CharacterCard(jsonData);
                     img_name = setCardName(jsonData.name);
                     if(checkCharaProp(img_name).length > 0){
                         let char = charaFormatData(jsonData);
@@ -2088,7 +2308,17 @@ app.post("/importcharacter", urlencodedParser, async function(request, response)
             }
         }
 });
-
+function parseV2CharacterCard(jsonData){
+    return {
+        name: jsonData.data.name, 
+        description: jsonData.data.description, 
+        personality: jsonData.data.personality,
+        first_mes: jsonData.data.first_mes,
+        mes_example: jsonData.data.mes_example,
+        scenario: jsonData.data.scenario
+    };
+    
+}
 app.post("/importchat", urlencodedParser, function(request, response){
     if(!request.body) return response.sendStatus(400);
         var format = request.body.file_type;
@@ -2438,7 +2668,13 @@ app.listen(server_port, listenIp, function() {
     initializationCards();
     clearUploads();
     initCardeditor();
-    if(autorun) open('http:127.0.0.1:'+server_port);
+    
+    const autorunUrl = new URL(
+            ('http://') +
+            ('127.0.0.1') +
+            (':' + server_port)
+            );
+    if(autorun) open(autorunUrl.toString());
     console.log('TavernAI started: http://127.0.0.1:'+server_port);
     
 });

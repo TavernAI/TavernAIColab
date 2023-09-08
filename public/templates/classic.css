@@ -594,6 +594,19 @@ textarea {
 #firstmessage_textarea{
     height: 140px;
 }
+#room_select_more_chars_button {
+	margin-left: auto;
+	margin-right: auto;
+	display: block;
+	height: 3em;
+	border: thin solid rgba(200,200,200,0.2);
+	border-radius: 3px;
+	background-color: #191b3133;
+	padding: 1ex;
+	cursor: pointer;
+	font-weight: bold;
+	font-size: 0.8em;
+}
 
 .right_menu{
     /* padding: 15px 20px; */
@@ -616,7 +629,7 @@ textarea {
     margin-bottom: 5px;
 }
 
-#proxy_set_context_size_button {
+#proxy_set_context_size_button, #kobold_set_context_size_button, #webui_set_context_size_button {
     cursor: pointer;
     display: inline-block;
     font-weight: 600;
@@ -761,7 +774,7 @@ input[type=submit], input[type=button] {
     display: none;
 }
 
-#api_url_text, #api_key_novel, #api_key_openai, #horde_api_key {
+#api_url_text, api_url_text_webui, #api_key_novel, #api_key_openai, #horde_api_key {
     margin-right: 4px;
 }
 
@@ -770,7 +783,7 @@ input[type=submit], input[type=button] {
     display: inline-block;
 }
 
-#api_loading, #api_loading_novel, #api_loading_openai{
+#api_loading, #api_loading_webui, #api_loading_novel, #api_loading_openai{
     width: 25px;
     height: 25px;
     display: none;
@@ -1530,7 +1543,6 @@ label form {
 
 #colab_shadow_popup {
     z-index: 2298;
-    display: block;
 }
 #colab_popup_text {
     float: left;
@@ -1649,7 +1661,7 @@ label form {
     margin-top: 1ex;
     display: inline-block;
 }
-#online_status2, #online_status3, #online_status4 {
+#online_status2, #online_status3, #online_status4, #online_status_webui {
     opacity: 0.5;
     margin-top: 2px;
     margin-bottom: 30px;
@@ -1657,7 +1669,7 @@ label form {
 #online_status4 {
     margin-bottom: 26px;
 }
-#online_status_indicator, #online_status_indicator2, #online_status_indicator3 , #online_status_indicator4 {
+#online_status_indicator, #online_status_indicator2, #online_status_indicator3 , #online_status_indicator4, #online_status_indicator_webui {
     border-radius: 7px;
     width: 14px;
     height: 14px;
@@ -1669,7 +1681,7 @@ label form {
 .online_status_indicator_online {
     background-color: green;
 }
-#online_status_text, #online_status_text2, #online_status_text3, #online_status_text4 {
+#online_status_text, #online_status_text2, #online_status_text3, #online_status_text4, #online_status_text_webui {
     margin-left: 4px;
     display: inline-block;
 }
@@ -1741,7 +1753,7 @@ select {
     width:auto;
     height:26px;
 }
-#kobold_api, #novel_api, #openai_api, #horde_api {
+#kobold_api, #novel_api, #openai_api, #horde_api, #webui_api {
     position: relative;
     margin-left: 10px;
 }
@@ -1780,6 +1792,21 @@ select {
     background-color: black;
     border-radius: 1px !important;
     padding: 1px;
+}
+.ch_select_cross {
+	right: 7px;
+	position: absolute;
+	width: 50px !important;
+	height: 50px !important;
+	top: 20px;
+	opacity: 0.3;
+	display: none;
+}
+#room_character_selected_items .avatar:hover .ch_select_cross {
+	display: block;
+}
+#room_character_selected_items .avatar:hover img:not(.ch_select_cross) {
+	filter: brightness(50%);
 }
 #rm_api_block {
     display: none;
@@ -1864,7 +1891,7 @@ input[type="range"]::-ms-thumb {
 }
 
 
-#max_context_label{
+#max_context_label, #max_context_label{
     display: inline-block;
 }
 
@@ -1984,7 +2011,7 @@ input[type="range"]::-ms-thumb {
     
 }
 
-#max_context_grid {
+#max_context_grid, #max_context_grid_webui {
     display: grid;
     grid-template-rows: auto;
     grid-template-columns: 140px 55px;
@@ -2204,7 +2231,7 @@ label.checkbox :checked + span:after {
     margin-bottom: 16px;
 }
 #jailbreak_prompt_textarea {
-    height: 100px;
+    height: 140px;
 }
 #user_jailbreak_prompt_textarea {
     height: 60px;
@@ -2241,7 +2268,7 @@ label.checkbox :checked + span:after {
 #select_chat_popup {
     display: block;
     grid-template-rows: 50px 100px 100px auto 45px;
-    max-width:450px;
+    max-width:770px;
     height: 440px;
     position: absolute;
     z-index: 2066;
@@ -2257,7 +2284,7 @@ label.checkbox :checked + span:after {
     background: #191b31F0;
     border-radius: 5px;
 }
-.chat_delete, .chat_export {
+.chat_delete, .chat_export, .chat_name {
     padding: 5px;
     padding-top: 0px;
     padding-bottom: 10px;
@@ -2714,8 +2741,12 @@ label.wpp_label {
     /* height: 80%; */
     overflow: hidden;
     overflow-y: scroll;
-    max-width:430px;
+    max-width:757px;
     height: 350px;
+}
+#select_chat_div hr {
+    background-image: unset;
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 .select_chat_block {
     border-radius: 5px;
@@ -2723,7 +2754,7 @@ label.wpp_label {
     cursor:pointer;
     display: grid;
     grid-template-columns: 60px auto;
-    grid-template-rows: 26px auto;
+    grid-template-rows: auto auto;
 }
 .select_chat_block:hover {
     background-color: #ffffff07;
@@ -2740,7 +2771,11 @@ label.wpp_label {
 }
 
 .select_chat_block_filename {
+    opacity:0.99;
+}
+.select_chat_block_filename_text {
     opacity:0.5;
+    display: inline-block;
 }
 .select_chat_block_mes {
     margin-right: 6px;
@@ -2941,7 +2976,7 @@ li.folder:not(.opened) > .children > li.folder:not(.opened) > div {
     background-position-x: 1em;
     background-position-y: 1ex;
 }
-.folder .delete:hover, .folder .rename:hover {
+.folder .delete:hover, .folder .rename:hover, .select_chat_block .rename:hover {
     opacity: 1;
 }
 .folder .delete {
@@ -2954,7 +2989,21 @@ li.folder:not(.opened) > .children > li.folder:not(.opened) > div {
     background-position-x: 1em;
     background-image: url("../img/quill.png");
 }
-
+.select_chat_block .rename {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background-image: url("../img/quill.png");
+    width: 2.5em;
+    height: 2.5em;
+    background-size: 1.25em;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    opacity: 0.3;
+    background-position-x: 0.25em;
+    background-position-y: 0.5ex;
+}
 
 /* Right nav */
 
