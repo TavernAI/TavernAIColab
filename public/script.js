@@ -39,7 +39,7 @@ export const gap_holder = 120;
 export var online_status = 'no_connection';
 var chat_name;
 const VERSION = '1.5.1';
-/*
+
 var chloeMes = {
         name: 'Chloe',
         is_user: false,
@@ -50,7 +50,7 @@ var chloeMes = {
             '<div id="characloud_img"><img src="img/tavern.png" id="chloe_star_dust_city"></div>\n<a id="verson" href="https://github.com/TavernAI/TavernAI" target="_blank">@@@TavernAI v'+VERSION+'@@@</a><a href="https://boosty.to/tavernai" target="_blank"><div id="characloud_url"><img src="img/cloud_logo.png"><div id="characloud_title">Support</div></div></a><br><br><br><br>',
         chid: -2
     };
-*/
+/*
 var chloeMes = {
         name: 'Chloe',
         is_user: false,
@@ -61,6 +61,7 @@ var chloeMes = {
             '<div id="characloud_img"><img src="img/tavern_summer.png" id="chloe_star_dust_city"></div>\n<a id="verson" href="https://github.com/TavernAI/TavernAI" target="_blank">@@@TavernAI v'+VERSION+'@@@</a><a href="https://boosty.to/tavernai" target="_blank"><div id="characloud_url"><img src="img/heart.png" style="width:18px; heigth:18px; margin-right:2px;"><div id="characloud_title">Support</div></div></a><br><br><br><br>',
         chid: -2
     };
+    */
 export var chat = [chloeMes];
 
 
@@ -1345,7 +1346,7 @@ $(document).ready(function(){
         var avatarImg = "User Avatars/"+user_avatar;
         if(!mes.is_user){
             if(Characters.selectedID === undefined) {
-                avatarImg = "img/chloe_summer.png";
+                avatarImg = "img/chloe.png";
             } else {
                 //mes.chid = mes.chid || parseInt(Characters.selectedID);
                 if(!is_room)
